@@ -1,0 +1,964 @@
+﻿@{
+    ViewData["Title"] = "Music Space";
+}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+    body, html {
+        height: 100%;
+        overflow: hidden;
+        background-color: #121212;
+        color: white;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Account for navbar height + safe area top & bottom */
+    #playerSection {
+        height: calc(100vh - 120px) !important;
+        max-height: calc(100vh - 120px) !important;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+
+    /* Invisible spacer at bottom */
+    .bottom-spacer {
+        height: 30px;
+        flex-shrink: 0;
+        background: #121212;
+    }
+
+    footer {
+        display: none !important;
+    }
+
+    .list-group-item {
+        background-color: #000;
+    }
+
+    .right-panel {
+        background-color: #1e1e1e;
+        border-left: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    @@media (min-width: 992px) {
+        .vh-lg-100 {
+            height: 100% !important;
+        }
+
+        .left-panel-container {
+            height: 100%;
+            overflow: hidden;
+        }
+    }
+
+    @@media (max-width: 991px) {
+        #playerSection {
+            height: calc(100vh - 120px) !important;
+            flex-direction: column;
+            margin-top: 10px;
+        }
+        .left-panel-container {
+            height: 50%;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+
+        .right-panel {
+            height: 50%;
+            border-left: none;
+            border-top: 1px solid #333;
+        }
+    }
+
+    .nav-tabs {
+        flex-shrink: 0;
+        border-bottom: 1px solid #333;
+    }
+
+        .nav-tabs .nav-link {
+            color: #aaa;
+            border: none;
+            padding: 12px;
+        }
+
+            .nav-tabs .nav-link.active {
+                background-color: #1e1e1e;
+                color: #dc3545;
+                border-bottom: 3px solid #dc3545;
+            }
+
+    .tab-content-area {
+        flex-grow: 1;
+        overflow-y: auto;
+        min-height: 0;
+        padding: 0;
+        padding-bottom: 50px;
+    }
+
+    .status-box {
+        opacity: 0;
+        transition: opacity 0.5s ease-out;
+        max-width: 600px;
+        margin: 10px auto 0 auto;
+        min-height: 25px;
+        background-color: rgba(0,0,0,0.6);
+        border-radius: 15px;
+        padding: 5px 15px;
+    }
+
+        .status-box.show {
+            opacity: 1;
+            transition: none;
+        }
+
+    @@keyframes floatUp {
+        0% {
+            transform: translateY(100%) scale(0.5);
+            opacity: 1;
+        }
+
+        100% {
+            transform: translateY(-300px) scale(1.5);
+            opacity: 0;
+        }
+    }
+
+    .floating-emoji {
+        position: absolute;
+        bottom: 0;
+        animation: floatUp 3s linear forwards;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-shadow: 0 2px 5px rgba(0,0,0,0.8);
+        z-index: 15;
+        pointer-events: none;
+    }
+
+    .emoji-sender {
+        font-size: 12px;
+        font-weight: bold;
+        color: #fff;
+        background: rgba(0,0,0,0.6);
+        padding: 1px 6px;
+        border-radius: 10px;
+        margin-top: -5px;
+    }
+
+    .list-item-custom {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #333;
+        color: #e0e0e0;
+    }
+
+    .list-thumb {
+        width: 60px;
+        height: 45px;
+        object-fit: cover;
+        border-radius: 4px;
+        margin-right: 10px;
+    }
+
+    .list-info {
+        overflow: hidden;
+        flex-grow: 1;
+    }
+
+    .list-title {
+        font-size: 13px;
+        font-weight: bold;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #fff;
+    }
+
+    .list-req {
+        font-size: 11px;
+        color: #aaa;
+    }
+
+    .code-hidden {
+        letter-spacing: 3px;
+        filter: blur(4px);
+        user-select: none;
+    }
+
+    .code-visible {
+        letter-spacing: 1px;
+        filter: none;
+        font-weight: bold;
+        color: #ffc107;
+    }
+
+    /* ভিডিও কন্টেইনার - পুরো বাম প্যানেল জুড়ে */
+    #videoContainer {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+    }
+
+    #youtube-player {
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Sliding control bar */
+    .video-controls-overlay {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px 16px;
+        background: linear-gradient(rgba(0,0,0,0.9), rgba(0,0,0,0.7));
+        z-index: 40;
+        transform: translateY(0);
+        transition: transform 0.3s ease-in-out, opacity 0.2s ease-in-out;
+        opacity: 0;
+    }
+
+    /* On hover/touch, slide up to near top */
+    #videoContainer:hover .video-controls-overlay,
+    #videoContainer.show-controls .video-controls-overlay {
+        transform: translateY(-15%);
+        opacity: 1;
+    }
+
+    /* Mobile: force one-line and ultra-compact sizes */
+    @@media (max-width: 576px) {
+        .video-controls-overlay { padding: 3px 4px; }
+        .video-controls-overlay > .d-flex { flex-wrap: nowrap !important; align-items: center; gap: 0; justify-content: space-between; }
+        #timeDisplay { font-size: 0.5rem !important; margin: 0 0 0 5px; padding: 0; white-space: nowrap; flex-shrink: 0; }
+        .emoji-row { gap: 0 !important; margin: 0; flex-shrink: 0; column-gap: 6px !important; }
+        .control-row { gap: 0 !important; flex-shrink: 0; column-gap: 5px !important; }
+        .emoji-row .emoji-btn { font-size: 15px !important; padding: 0; margin: 0; line-height: 1; display: inline-block; }
+        .control-row .control-btn { font-size: 15px !important; padding: 1px 1px !important; margin: 0 5px 0 0; line-height: 1; }
+        .control-row .control-btn.play-btn { font-size: 20px !important; }
+    }
+
+    .control-btn {
+        background: transparent !important;
+        border: none !important;
+        color: #fff !important;
+        font-size: 1.4rem !important;
+        padding: 10px 14px !important;
+        opacity: 0.9;
+        transition: all 0.2s;
+    }
+
+        .control-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .control-btn.play-btn {
+            font-size: 1.8rem !important;
+        }
+
+    #timeDisplay {
+        color: #fff;
+        font-size: 0.85rem;
+    }
+
+    /* ইমোজি এবং স্ট্যাটাস */
+    /* Emojis will be inside the sliding bar; keep this hidden container for floating reactions only */
+    .emoji-reactions { display: none; }
+
+    .emoji-btn {
+        font-size: 1.5rem;
+        padding: 5px 8px;
+        background: transparent;
+        border: none;
+        transition: transform 0.2s;
+    }
+
+        .emoji-btn:hover {
+            transform: scale(1.3);
+        }
+
+    #reactionArea {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 20;
+    }
+
+    .status-box-video {
+        position: absolute;
+        left: 50%;
+        top: 10%;
+        transform: translateX(-50%);
+        background-color: rgba(0,0,0,0.7);
+        border-radius: 20px;
+        padding: 8px 20px;
+        color: #fff;
+        font-size: 0.9rem;
+        opacity: 0;
+        transition: opacity 0.3s ease-out;
+        z-index: 45;
+        pointer-events: none;
+    }
+
+    .status-box-video.show { opacity: 1; }
+
+    /* Player overlay for click detection */
+    #playerOverlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: calc(100% - 60px);
+        background: transparent;
+        z-index: 22;
+        cursor: pointer;
+    }
+
+    /* fullscreen cursor hide helper */
+    #videoContainer.hide-cursor:fullscreen,
+    #videoContainer.hide-cursor:fullscreen * { cursor: none !important; }
+
+    /* Fullscreen: disable hover effect, only JS class will control bar */
+    #videoContainer:fullscreen .video-controls-overlay {
+        transform: translateY(0);
+        opacity: 0;
+    }
+    #videoContainer:fullscreen:hover .video-controls-overlay {
+        transform: translateY(0);
+        opacity: 0;
+    }
+    #videoContainer:fullscreen.show-controls .video-controls-overlay {
+        transform: translateY(-25%) !important;
+        opacity: 1 !important;
+    }
+    /* Fullscreen: center the control bar content */
+    #videoContainer:fullscreen .video-controls-overlay > .d-flex {
+        justify-content: center !important;
+        gap: 30px !important;
+    }
+
+    /* Desktop-only tuning for slide distance */
+    @@media (min-width: 992px) {
+        #videoContainer:hover .video-controls-overlay,
+        #videoContainer.show-controls .video-controls-overlay {
+            transform: translateY(-20%);
+        }
+    }
+
+    /* Chat styles */
+    .chat-message {
+        margin-bottom: 6px;
+        padding: 5px 10px;
+        border-radius: 10px;
+        max-width: 85%;
+        word-wrap: break-word;
+    }
+    .chat-message.mine {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+        margin-left: auto;
+        border-bottom-right-radius: 4px;
+    }
+    .chat-message.other {
+        background: #333;
+        margin-right: auto;
+        border-bottom-left-radius: 4px;
+    }
+    .chat-sender {
+        font-size: 10px;
+        color: #aaa;
+        margin-bottom: 1px;
+    }
+    .chat-message.mine .chat-sender {
+        color: rgba(255,255,255,0.7);
+        text-align: right;
+    }
+    .chat-text {
+        font-size: 13px;
+        color: #fff;
+        white-space: pre-wrap;
+    }
+    .chat-time {
+        font-size: 10px;
+        color: #888;
+        margin-top: 3px;
+    }
+    .chat-message.mine .chat-time {
+        text-align: right;
+    }
+    /* Tab content area - flex container */
+    .tab-content-area {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        padding-bottom: 0;
+    }
+    /* All tabs get full height and scroll */
+    .tab-content-area > .tab-pane {
+        height: 100%;
+        overflow-y: auto;
+    }
+    /* Chat pane special styling - needs flex for input at bottom */
+    #chatPane {
+        position: relative;
+    }
+    #chatPane.show.active {
+        display: flex !important;
+        flex-direction: column;
+    }
+    #chatMessages {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+        padding: 10px;
+        padding-bottom: 60px;
+    }
+    /* Chat input fixed at bottom */
+    .chat-input-box {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 8px;
+        background: #1e1e1e;
+        border-top: 1px solid #333;
+        z-index: 5;
+    }
+    /* Notification badge - on top of icon */
+    .notification-badge {
+        position: absolute;
+        top: 0px;
+        left: 50%;
+        transform: translateX(3px);
+        background: #dc3545;
+        color: white;
+        font-size: 9px;
+        font-weight: bold;
+        min-width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        line-height: 1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        pointer-events: none;
+        z-index: 10;
+    }
+    .notification-badge.hidden {
+        display: none;
+    }
+    .nav-item {
+        position: relative;
+    }
+    /* Remove focus outline from buttons and inputs */
+    .btn:focus, .btn:active:focus, .btn-close:focus,
+    .form-control:focus, textarea:focus, input:focus,
+    .nav-link:focus {
+        outline: none !important;
+        box-shadow: none !important;
+    }
+</style>
+
+<div class="container-fluid p-0 h-100">
+
+    <div id="loginSection" class="d-flex justify-content-center align-items-center vh-100" style="background: #121212;">
+        <div class="card p-5 shadow-lg border-0 text-center" style="width: 100%; max-width: 450px; background: #1e1e1e; color: white; border-radius: 15px;">
+            <h1 class="mb-5 text-danger fw-bold"><i class="fas fa-music"></i> Music Space</h1>
+
+            <div id="stepInitial">
+                <button onclick="showStep('create')" class="btn btn-danger w-100 mb-3 fw-bold py-3 shadow" style="font-size: 1.1rem;"><i class="fas fa-plus-circle me-2"></i> Create New Room</button>
+                <button onclick="showStep('join')" class="btn btn-outline-light w-100 mb-3 py-3" style="font-size: 1.1rem;"><i class="fas fa-sign-in-alt me-2"></i> Join Existing Room</button>
+            </div>
+
+            <div id="stepCreate" style="display:none;">
+                <h5 class="text-white mb-4">Create Your Room</h5>
+                <input type="text" id="createNameInput" class="form-control mb-4 bg-dark text-white border-secondary p-3" placeholder="Enter Your Nickname" onkeyup="handleLoginKeys(event, 'create')" />
+                <button id="btnCreate" onclick="createRoom()" class="btn btn-danger w-100 mb-3 fw-bold py-2" disabled><i class="fas fa-spinner fa-spin"></i> Connecting...</button>
+                <button onclick="showStep('initial')" class="btn btn-sm btn-link text-muted text-decoration-none">Back</button>
+            </div>
+
+            <div id="stepJoin" style="display:none;">
+                <h5 class="text-white mb-4">Join a Party</h5>
+                <input type="text" id="joinNameInput" class="form-control mb-3 bg-dark text-white border-secondary p-3" placeholder="Enter Your Nickname" />
+                <input type="text" id="roomInput" class="form-control mb-4 bg-dark text-white border-secondary p-3" placeholder="Enter Room Code" onkeyup="handleLoginKeys(event, 'join')" />
+                <button id="btnJoin" onclick="joinRoom()" class="btn btn-outline-light w-100 mb-3 py-2" disabled>Join Room</button>
+                <button onclick="showStep('initial')" class="btn btn-sm btn-link text-muted text-decoration-none">Back</button>
+            </div>
+            <div id="connectionStatus" class="text-muted small mt-4">Connecting to server...</div>
+        </div>
+    </div>
+
+    <div id="playerSection" class="row g-0 h-100" style="display:none !important;">
+
+        <div class="col-lg-8 col-12 left-panel-container d-flex flex-column bg-black position-relative">
+            <!-- হেডার -->
+            <div class="d-flex justify-content-between align-items-center p-2 px-3 bg-dark border-bottom border-secondary" style="height: 50px; flex-shrink: 0;">
+                <h6 id="roomTitle" class="m-0 text-white"><i class="fas fa-satellite-dish text-danger"></i> Room</h6>
+                <div class="d-flex align-items-center bg-black px-2 py-1 rounded border border-secondary">
+                    <span class="text-muted me-2 small">CODE:</span>
+                    <span id="roomCodeDisplay" class="code-hidden me-2" style="font-size: 0.85rem;">****</span>
+                    <button id="btnRevealCode" onclick="toggleCode()" class="btn btn-sm btn-link text-white p-0" style="display:none;"><i id="eyeIcon" class="fas fa-eye"></i></button>
+                </div>
+            </div>
+
+            <!-- ভিডিও প্লেয়ার - পুরো জায়গা জুড়ে -->
+            <div class="flex-grow-1 position-relative" style="min-height: 0;">
+                <div id="videoContainer">
+                    <div id="youtube-player"></div>
+                    <div id="playerOverlay" onclick="toggleControls()"></div>
+                    <div id="reactionArea"></div>
+
+                    <!-- স্ট্যাটাস মেসেজ -->
+                    <div class="status-box-video" id="statusBox"></div>
+
+                    <!-- ইমোজি রিঅ্যাকশন -->
+                    <div class="emoji-reactions">
+                        <button onclick="sendEmoji('❤️')" class="emoji-btn">❤️</button>
+                        <button onclick="sendEmoji('🔥')" class="emoji-btn">🔥</button>
+                        <button onclick="sendEmoji('😂')" class="emoji-btn">😂</button>
+                        <button onclick="sendEmoji('👻')" class="emoji-btn">👻</button>
+                    </div>
+
+                    <!-- কন্ট্রোল বার - ভিডিওর নিচে ওভারলে -->
+                    <div class="video-controls-overlay">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <!-- Time -->
+                            <div id="timeDisplay" class="font-monospace">00:00 / 00:00</div>
+                            <!-- Emojis -->
+                            <div class="d-flex align-items-center emoji-row gap-1">
+                                <button onclick="sendEmoji('❤️'); event.stopPropagation();" class="emoji-btn" title="Love">❤️</button>
+                                <button onclick="sendEmoji('🔥'); event.stopPropagation();" class="emoji-btn" title="Fire">🔥</button>
+                                <button onclick="sendEmoji('😂'); event.stopPropagation();" class="emoji-btn" title="Laugh">😂</button>
+                                <button onclick="sendEmoji('👻'); event.stopPropagation();" class="emoji-btn" title="Ghost">👻</button>
+                            </div>
+                            <!-- Controls -->
+                            <div class="d-flex align-items-center control-row gap-2">
+                                <button onclick="seekMusic(-10); event.stopPropagation();" class="control-btn" title="Rewind 10s"><i class="fas fa-backward"></i></button>
+                                <button onclick="sendAction('toggle'); event.stopPropagation();" class="control-btn play-btn" title="Play/Pause"><i class="fas fa-play"></i></button>
+                                <button onclick="seekMusic(10); event.stopPropagation();" class="control-btn" title="Forward 10s"><i class="fas fa-forward"></i></button>
+                                <button onclick="sendAction('skip'); event.stopPropagation();" class="control-btn" title="Next"><i class="fas fa-step-forward"></i></button>
+                                <button onclick="toggleFullScreen(); event.stopPropagation();" class="control-btn" title="Fullscreen"><i class="fas fa-expand"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4 col-12 right-panel vh-lg-100">
+            <ul class="nav nav-tabs nav-fill pt-2" id="myTab" role="tablist">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#chatPane" id="chatTabBtn"><i class="fas fa-comments"></i> Chat</button><span id="chatBadge" class="notification-badge hidden">0</span></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#searchPane"><i class="fas fa-search"></i> Search</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#queuePane"><i class="fas fa-list-ol"></i> Queue</button></li>
+                <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#usersPane"><i class="fas fa-users"></i> Users</button></li>
+            </ul>
+
+            <div class="tab-content tab-content-area" id="myTabContent">
+                <!-- Chat Pane -->
+                <div class="tab-pane fade show active" id="chatPane">
+                    <div id="chatMessages"></div>
+                    <div class="chat-input-box">
+                        <div class="input-group">
+                            <textarea id="chatInput" class="form-control bg-dark text-white border-secondary" placeholder="Type a message..." onkeydown="handleChatEnter(event)" rows="1" style="resize: none; max-height: 80px; overflow-y: auto;"></textarea>
+                            <button class="btn btn-danger" onclick="sendChatMessage()"><i class="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane fade p-3" id="searchPane">
+                    <div class="input-group mb-3 sticky-top">
+                        <input type="text" id="searchInput" class="form-control bg-dark text-white border-secondary" placeholder="Search YouTube" onkeypress="handleEnter(event)">
+                        <button class="btn btn-danger" onclick="searchYouTube()"><i class="fas fa-search"></i></button>
+                    </div>
+                    <div id="searchResults"><div class="text-center text-muted mt-5"><i class="fab fa-youtube fa-3x mb-3"></i><br>Search songs...</div></div>
+                </div>
+                <div class="tab-pane fade" id="queuePane"><h6 class="p-2 text-muted border-bottom border-secondary m-0">Up Next</h6><div id="playList"></div></div>
+                <div class="tab-pane fade" id="historyPane"><h6 class="p-2 text-muted border-bottom border-secondary m-0">Recently Played</h6><div id="historyList"></div></div>
+                <div class="tab-pane fade" id="usersPane"><h6 class="p-2 text-muted border-bottom border-secondary m-0">Members</h6><ul id="userList" class="list-group list-group-flush"></ul></div>
+            </div>
+        </div>
+    </div>
+    <!-- Bottom spacer to prevent content cutoff -->
+    <div class="bottom-spacer"></div>
+</div>
+
+<script>
+    const connection = new signalR.HubConnectionBuilder().withUrl("/musicHub").build();
+    let currentRoom = "", myName = "", actualRoomCode = "", roomAdmin = "";
+    let notificationTimeout, controlsTimeout, codeRevealTimeout;
+    let unseenMessageCount = 0;
+    let isChatTabActive = true;
+
+    function showStep(step) {
+        document.getElementById('stepInitial').style.display = 'none';
+        document.getElementById('stepCreate').style.display = 'none';
+        document.getElementById('stepJoin').style.display = 'none';
+        if (step === 'initial') document.getElementById('stepInitial').style.display = 'block';
+        else if (step === 'create') document.getElementById('stepCreate').style.display = 'block';
+        else if (step === 'join') document.getElementById('stepJoin').style.display = 'block';
+    }
+
+    // Toggle controls on tap/click
+    function toggleControls() {
+        const container = document.getElementById('videoContainer');
+        container.classList.toggle('show-controls');
+
+        // Auto-hide after 3 seconds
+        if (controlsTimeout) clearTimeout(controlsTimeout);
+        if (container.classList.contains('show-controls')) {
+            controlsTimeout = setTimeout(() => {
+                container.classList.remove('show-controls');
+            }, 3000);
+        }
+    }
+
+    connection.start().then(() => {
+        document.getElementById("connectionStatus").innerText = "Connected! Select an option.";
+        document.getElementById("connectionStatus").className = "text-success small mt-4";
+        const btnCreate = document.getElementById("btnCreate");
+        if(btnCreate) { btnCreate.disabled = false; btnCreate.innerHTML = "Create Room"; btnCreate.classList.replace("btn-secondary", "btn-danger"); }
+        const btnJoin = document.getElementById("btnJoin");
+        if(btnJoin) btnJoin.disabled = false;
+    }).catch(err => {
+        console.error(err);
+        document.getElementById("connectionStatus").innerText = "Connection Failed.";
+        document.getElementById("connectionStatus").className = "text-danger small mt-4";
+    });
+
+    var tag = document.createElement('script'); tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0]; firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    var player;
+
+    function onYouTubeIframeAPIReady() {
+        player = new YT.Player('youtube-player', {
+            height: '100%', width: '100%', videoId: '',
+            playerVars: { 'playsinline': 1, 'controls': 0, 'disablekb': 1, 'rel': 0 },
+            events: {
+                'onReady': (e) => e.target.setVolume(100),
+                'onStateChange': onPlayerStateChange
+            }
+        });
+    }
+
+    function onPlayerStateChange(event) {
+        if (event.data === 0 && myName === roomAdmin) {
+            connection.invoke("TrackEnded", currentRoom);
+        }
+    }
+
+    setInterval(() => {
+        if (player && player.getCurrentTime) {
+            let current = formatTime(player.getCurrentTime());
+            let total = formatTime(player.getDuration());
+            document.getElementById("timeDisplay").innerText = `${current} / ${total}`;
+        }
+    }, 1000);
+
+    function formatTime(seconds) {
+        if (!seconds) return "00:00";
+        let min = Math.floor(seconds / 60);
+        let sec = Math.floor(seconds % 60);
+        return `${min < 10 ? '0' : ''}${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+
+    function searchYouTube() {
+        const query = document.getElementById('searchInput').value;
+        if (!query) return;
+        if(query.includes("youtube.com") || query.includes("youtu.be")) { addToQueue(query); return; }
+        document.getElementById('searchResults').innerHTML = '<div class="text-center mt-3"><div class="spinner-border text-danger"></div></div>';
+        connection.invoke("SearchYouTube", query).catch(err => console.error(err));
+    }
+
+    connection.on("ReceiveSearchResults", (videos) => {
+        const div = document.getElementById('searchResults');
+        div.innerHTML = '';
+        if(videos.length === 0) { div.innerHTML = "<p class='text-center text-muted'>No results.</p>"; return; }
+        videos.forEach(v => {
+            div.innerHTML += `
+                <div class="list-item-custom hover-bg">
+                    <img src="${v.thumbnail}" class="list-thumb">
+                    <div class="list-info">
+                        <div class="list-title text-white">${v.title}</div>
+                        <div class="list-req">${v.author}</div>
+                    </div>
+                    <button onclick="handleAddToQueue(this, '${v.videoId}')" class="btn btn-sm btn-outline-danger ms-2"><i class="fas fa-plus"></i></button>
+                </div>`;
+        });
+    });
+
+    function handleAddToQueue(btn, vid) {
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.classList.remove("btn-outline-danger"); btn.classList.add("btn-success");
+        addToQueue(vid);
+    }
+
+    function addToQueue(vidOrUrl) {
+        let url = vidOrUrl.includes("http") ? vidOrUrl : `https://youtube.com/watch?v=${vidOrUrl}`;
+        connection.invoke("PlayRequest", currentRoom, url, myName);
+    }
+
+    function showNotification(msg) {
+        const box = document.getElementById("statusBox");
+        box.innerText = msg;
+        box.classList.add("show");
+        if (notificationTimeout) clearTimeout(notificationTimeout);
+        notificationTimeout = setTimeout(() => {
+            box.classList.remove("show");
+            setTimeout(() => { if(!box.classList.contains("show")) box.innerText = ""; }, 500);
+        }, 3000);
+    }
+
+    connection.on("ReceiveStatus", (msg, type, data) => {
+        let sender = (data && data.user) ? (data.user === myName ? "You" : data.user) : "";
+        let fullMsg = "";
+
+        if(type==='playNew') {
+            if(data && data.videoId) { player.loadVideoById(data.videoId); player.playVideo(); }
+            fullMsg = "Playing: " + msg;
+        }
+        else if(type==='pause') { player.pauseVideo(); fullMsg = `${sender} paused`; }
+        else if(type==='play') { player.playVideo(); fullMsg = `${sender} resumed`; }
+        else if(type==='emoji') showEmoji(data.emoji, sender);
+        else if(type==='info') fullMsg = sender ? `${sender} ${msg}` : msg;
+        else fullMsg = msg;
+
+        if (type !== 'emoji') showNotification(fullMsg);
+    });
+
+    function showEmoji(emoji, sender) {
+        const area = document.getElementById("reactionArea");
+        const el = document.createElement("div");
+        el.className = "floating-emoji";
+        el.style.left = (Math.random() * 80 + 10) + "%";
+        el.innerHTML = `${emoji} <span class="emoji-sender">${sender}</span>`;
+        area.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+    }
+
+    connection.on("SyncNewUser", (vid, sec, play) => {
+        if(vid) {
+            player.loadVideoById({'videoId': vid, 'startSeconds': sec});
+            setTimeout(() => { if(!play) player.pauseVideo(); }, 1000);
+        }
+    });
+    connection.on("SyncSeek", (sec) => player.seekTo(sec, true));
+
+    const updateRichList = (id, items) => {
+        const list = document.getElementById(id);
+        if(!list) return;
+        list.innerHTML = "";
+        if(items.length === 0) list.innerHTML = "<div class='text-center text-muted mt-3 small'>Empty</div>";
+        items.forEach(item => {
+            let title = item.title || "Unknown";
+            let thumb = item.thumbnail || "https://via.placeholder.com/60x45?text=?";
+            let user = item.requester || "";
+            list.innerHTML += `
+                <div class="list-item-custom">
+                    <img src="${thumb}" class="list-thumb">
+                    <div class="list-info">
+                        <div class="list-title text-white" title="${title}">${title}</div>
+                        <div class="list-req">By: ${user}</div>
+                    </div>
+                </div>`;
+        });
+    };
+
+    connection.on("UpdatePlaylist", (s) => updateRichList("playList", s));
+    connection.on("UpdateHistory", (h) => updateRichList("historyList", h));
+    connection.on("UpdateUserList", (users) => {
+        const list = document.getElementById("userList");
+        list.innerHTML = "";
+        users.forEach(u => list.innerHTML += `<li class='list-group-item text-white border-bottom border-secondary py-2 small'><i class="fas fa-user"></i> ${u}</li>`);
+    });
+
+    connection.on("JoinSuccess", (code, rName, admin) => {
+        currentRoom = code; actualRoomCode = code; roomAdmin = admin;
+        document.getElementById("loginSection").style.setProperty("display", "none", "important");
+        document.getElementById("playerSection").style.setProperty("display", "flex", "important");
+        document.getElementById("roomTitle").innerHTML = `<i class="fas fa-satellite-dish text-danger"></i> ${rName}`;
+        document.getElementById("roomCodeDisplay").innerText = "****";
+        if (myName === roomAdmin) document.getElementById("btnRevealCode").style.display = "inline-block";
+    });
+
+    async function createRoom() {
+        myName = document.getElementById("createNameInput").value;
+        if (!myName) return alert("Name?");
+        try {
+            const code = await connection.invoke("CreateRoom", myName);
+            await connection.invoke("JoinRoom", code, myName);
+        } catch(e) { console.error(e); alert("Error creating room."); }
+    }
+    async function joinRoom() {
+        myName = document.getElementById("joinNameInput").value;
+        const code = document.getElementById("roomInput").value;
+        if (!myName || !code) return alert("Info?");
+        await connection.invoke("JoinRoom", code, myName);
+    }
+    function sendAction(a) { connection.invoke("ActionRequest", currentRoom, myName, a); }
+    function sendEmoji(e) { connection.invoke("SendReaction", currentRoom, myName, e); }
+    function seekMusic(o) { connection.invoke("SeekRequest", currentRoom, myName, o); }
+    function handleEnter(e) { if(e.key === 'Enter') searchYouTube(); }
+    function toggleCode() {
+        const d = document.getElementById("roomCodeDisplay");
+        const icon = document.getElementById("eyeIcon");
+        
+        // Clear any existing timeout
+        if (codeRevealTimeout) clearTimeout(codeRevealTimeout);
+        
+        if(d.innerText === "****") {
+            // Show code
+            d.innerText = actualRoomCode;
+            d.classList.replace("code-hidden", "code-visible");
+            icon.classList.replace("fa-eye", "fa-eye-slash");
+            
+            // Auto-hide after 8 seconds
+            codeRevealTimeout = setTimeout(() => {
+                d.innerText = "****";
+                d.classList.replace("code-visible", "code-hidden");
+                icon.classList.replace("fa-eye-slash", "fa-eye");
+            }, 8000);
+        } else {
+            // Hide code immediately
+            d.innerText = "****";
+            d.classList.replace("code-visible", "code-hidden");
+            icon.classList.replace("fa-eye-slash", "fa-eye");
+        }
+    }
+    function toggleFullScreen() {
+        const elem = document.getElementById("videoContainer");
+        if (!document.fullscreenElement) elem.requestFullscreen(); else document.exitFullscreen();
+    }
+
+    function handleLoginKeys(event, action) {
+        if (event.key === 'Enter' || event.keyCode === 13) {
+            if (action === 'create') createRoom();
+            else if (action === 'join') joinRoom();
+        }
+    }
+
+    // Chat functions
+    function sendChatMessage() {
+        const input = document.getElementById('chatInput');
+        const msg = input.value.trim();
+        if (!msg || !currentRoom) return;
+        connection.invoke("SendMessage", currentRoom, myName, msg);
+        input.value = '';
+    }
+
+    function handleChatEnter(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    }
+
+    connection.on("ReceiveMessage", (user, message) => {
+        const chatBox = document.getElementById('chatMessages');
+        const isMine = user === myName;
+        const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message ${isMine ? 'mine' : 'other'}`;
+        msgDiv.innerHTML = `
+            <div class="chat-sender">${isMine ? 'You' : user}</div>
+            <div class="chat-text">${escapeHtml(message)}</div>
+            <div class="chat-time">${time}</div>
+        `;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // Update badge if chat tab is not active and message is from others
+        if (!isChatTabActive && !isMine) {
+            unseenMessageCount++;
+            updateChatBadge();
+        }
+    });
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Update chat badge
+    function updateChatBadge() {
+        const badge = document.getElementById('chatBadge');
+        if (unseenMessageCount > 0) {
+            badge.textContent = unseenMessageCount > 9 ? '9+' : unseenMessageCount;
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+
+    // Clear badge when chat tab is clicked
+    document.getElementById('chatTabBtn').addEventListener('click', function() {
+        isChatTabActive = true;
+        unseenMessageCount = 0;
+        updateChatBadge();
+    });
+
+    // Track when other tabs are clicked
+    document.querySelectorAll('#myTab .nav-link:not(#chatTabBtn)').forEach(btn => {
+        btn.addEventListener('click', function() {
+            isChatTabActive = false;
+        });
+    });
+
+    // Fullscreen cursor auto-hide after 2 seconds of inactivity
+    (function() {
+        let cursorTimer;
+        const vc = document.getElementById('videoContainer');
+        
+        function showCursorAndBar() {
+            if (vc) {
+                vc.classList.remove('hide-cursor');
+                vc.classList.add('show-controls');
+            }
+        }
+        
+        function hideCursorAndBar() {
+            if (vc && document.fullscreenElement) {
+                vc.classList.add('hide-cursor');
+                vc.classList.remove('show-controls');
+            }
+        }
+        
+        function resetCursorTimer() {
+            // Only run this logic in fullscreen mode
+            if (!document.fullscreenElement) return;
+            
+            showCursorAndBar();
+            if (cursorTimer) clearTimeout(cursorTimer);
+            cursorTimer = setTimeout(hideCursorAndBar, 2000);
+        }
+        
+        // Mouse movement shows cursor/bar and resets timer (only in fullscreen)
+        document.addEventListener('mousemove', resetCursorTimer);
+        document.addEventListener('mousedown', resetCursorTimer);
+        document.addEventListener('touchstart', resetCursorTimer);
+        
+        // On fullscreen change
+        document.addEventListener('fullscreenchange', function() {
+            if (document.fullscreenElement) {
+                resetCursorTimer();
+            } else {
+                vc.classList.remove('hide-cursor');
+                vc.classList.remove('show-controls');
+                if (cursorTimer) clearTimeout(cursorTimer);
+            }
+        });
+    })();
+</script>
