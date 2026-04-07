@@ -19,14 +19,10 @@ namespace SharedMusicSpace.Models
         {
             string roomCode = Guid.NewGuid().ToString("N").Substring(0, 6).ToUpper();
             var newRoom = new MusicSpace(roomCode, roomName, adminName);
-
-            // --- Event Wiring ---
             newRoom.OnStatusChanged += async (msg, type, data) => await _hubContext.Clients.Group(roomCode).SendAsync("ReceiveStatus", msg, type, data);
             newRoom.OnUserListChanged += async (users) => await _hubContext.Clients.Group(roomCode).SendAsync("UpdateUserList", users);
             newRoom.OnPlaylistChanged += async (songs) => await _hubContext.Clients.Group(roomCode).SendAsync("UpdatePlaylist", songs);
             newRoom.OnSeekChanged += async (sec) => await _hubContext.Clients.Group(roomCode).SendAsync("SyncSeek", sec);
-
-            // [NEW] হিস্ট্রি কানেকশন
             newRoom.OnHistoryChanged += async (songs) => await _hubContext.Clients.Group(roomCode).SendAsync("UpdateHistory", songs);
 
             _activeRooms.TryAdd(roomCode, newRoom);
@@ -47,8 +43,6 @@ namespace SharedMusicSpace.Models
                 if (room != null)
                 {
                     room.RemoveUser(userInfo.UserName);
-                    // নোট: রুম থেকে সবাই চলে গেলে রুম ডিলিট করার লজিক এখানে বসানো যায়, 
-                    // তখন অটোমেটিক হিস্ট্রিও ডিলিট হয়ে যাবে কারণ MusicSpace অবজেক্ট মেমোরি থেকে চলে যাবে।
                 }
             }
         }

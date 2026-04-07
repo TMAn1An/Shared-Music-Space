@@ -14,7 +14,7 @@
         padding: 0;
     }
 
-    /* Account for navbar height + safe area top & bottom */
+    
     #playerSection {
         height: calc(100vh - 120px) !important;
         max-height: calc(100vh - 120px) !important;
@@ -22,7 +22,7 @@
         margin-top: 10px;
     }
 
-    /* Invisible spacer at bottom */
+    
     .bottom-spacer {
         height: 30px;
         flex-shrink: 0;
@@ -199,7 +199,7 @@
         color: #ffc107;
     }
 
-    /* ভিডিও কন্টেইনার - পুরো বাম প্যানেল জুড়ে */
+    
     #videoContainer {
         position: relative;
         width: 100%;
@@ -213,7 +213,7 @@
         height: 100%;
     }
 
-    /* Sliding control bar */
+    
     .video-controls-overlay {
         position: absolute;
         left: 0;
@@ -227,14 +227,14 @@
         opacity: 0;
     }
 
-    /* On hover/touch, slide up to near top */
+    
     #videoContainer:hover .video-controls-overlay,
     #videoContainer.show-controls .video-controls-overlay {
         transform: translateY(-15%);
         opacity: 1;
     }
 
-    /* Mobile: force one-line and ultra-compact sizes */
+    
     @@media (max-width: 576px) {
         .video-controls-overlay { padding: 3px 4px; }
         .video-controls-overlay > .d-flex { flex-wrap: nowrap !important; align-items: center; gap: 0; justify-content: space-between; }
@@ -270,8 +270,8 @@
         font-size: 0.85rem;
     }
 
-    /* ইমোজি এবং স্ট্যাটাস */
-    /* Emojis will be inside the sliding bar; keep this hidden container for floating reactions only */
+    
+    
     .emoji-reactions { display: none; }
 
     .emoji-btn {
@@ -314,7 +314,7 @@
 
     .status-box-video.show { opacity: 1; }
 
-    /* Player overlay for click detection */
+    
     #playerOverlay {
         position: absolute;
         top: 0;
@@ -326,11 +326,11 @@
         cursor: pointer;
     }
 
-    /* fullscreen cursor hide helper */
+    
     #videoContainer.hide-cursor:fullscreen,
     #videoContainer.hide-cursor:fullscreen * { cursor: none !important; }
 
-    /* Fullscreen: disable hover effect, only JS class will control bar */
+    
     #videoContainer:fullscreen .video-controls-overlay {
         transform: translateY(0);
         opacity: 0;
@@ -343,13 +343,13 @@
         transform: translateY(-25%) !important;
         opacity: 1 !important;
     }
-    /* Fullscreen: center the control bar content */
+    
     #videoContainer:fullscreen .video-controls-overlay > .d-flex {
         justify-content: center !important;
         gap: 30px !important;
     }
 
-    /* Desktop-only tuning for slide distance */
+    
     @@media (min-width: 992px) {
         #videoContainer:hover .video-controls-overlay,
         #videoContainer.show-controls .video-controls-overlay {
@@ -357,7 +357,7 @@
         }
     }
 
-    /* Chat styles */
+    
     .chat-message {
         margin-bottom: 6px;
         padding: 5px 10px;
@@ -397,19 +397,19 @@
     .chat-message.mine .chat-time {
         text-align: right;
     }
-    /* Tab content area - flex container */
+    
     .tab-content-area {
         flex: 1;
         min-height: 0;
         overflow: hidden;
         padding-bottom: 0;
     }
-    /* All tabs get full height and scroll */
+    
     .tab-content-area > .tab-pane {
         height: 100%;
         overflow-y: auto;
     }
-    /* Chat pane special styling - needs flex for input at bottom */
+    
     #chatPane {
         position: relative;
     }
@@ -424,7 +424,7 @@
         padding: 10px;
         padding-bottom: 60px;
     }
-    /* Chat input fixed at bottom */
+    
     .chat-input-box {
         position: absolute;
         bottom: 0;
@@ -435,7 +435,7 @@
         border-top: 1px solid #333;
         z-index: 5;
     }
-    /* Notification badge - on top of icon */
+    
     .notification-badge {
         position: absolute;
         top: 0px;
@@ -463,7 +463,7 @@
     .nav-item {
         position: relative;
     }
-    /* Remove focus outline from buttons and inputs */
+    
     .btn:focus, .btn:active:focus, .btn-close:focus,
     .form-control:focus, textarea:focus, input:focus,
     .nav-link:focus {
@@ -504,7 +504,7 @@
     <div id="playerSection" class="row g-0 h-100" style="display:none !important;">
 
         <div class="col-lg-8 col-12 left-panel-container d-flex flex-column bg-black position-relative">
-            <!-- হেডার -->
+            
             <div class="d-flex justify-content-between align-items-center p-2 px-3 bg-dark border-bottom border-secondary" style="height: 50px; flex-shrink: 0;">
                 <h6 id="roomTitle" class="m-0 text-white"><i class="fas fa-satellite-dish text-danger"></i> Room</h6>
                 <div class="d-flex align-items-center bg-black px-2 py-1 rounded border border-secondary">
@@ -514,17 +514,17 @@
                 </div>
             </div>
 
-            <!-- ভিডিও প্লেয়ার - পুরো জায়গা জুড়ে -->
+            
             <div class="flex-grow-1 position-relative" style="min-height: 0;">
                 <div id="videoContainer">
                     <div id="youtube-player"></div>
                     <div id="playerOverlay" onclick="toggleControls()"></div>
                     <div id="reactionArea"></div>
 
-                    <!-- স্ট্যাটাস মেসেজ -->
+                    
                     <div class="status-box-video" id="statusBox"></div>
 
-                    <!-- ইমোজি রিঅ্যাকশন -->
+                    
                     <div class="emoji-reactions">
                         <button onclick="sendEmoji('❤️')" class="emoji-btn">❤️</button>
                         <button onclick="sendEmoji('🔥')" class="emoji-btn">🔥</button>
@@ -532,19 +532,19 @@
                         <button onclick="sendEmoji('👻')" class="emoji-btn">👻</button>
                     </div>
 
-                    <!-- কন্ট্রোল বার - ভিডিওর নিচে ওভারলে -->
+                    
                     <div class="video-controls-overlay">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                            <!-- Time -->
+                            
                             <div id="timeDisplay" class="font-monospace">00:00 / 00:00</div>
-                            <!-- Emojis -->
+                            
                             <div class="d-flex align-items-center emoji-row gap-1">
                                 <button onclick="sendEmoji('❤️'); event.stopPropagation();" class="emoji-btn" title="Love">❤️</button>
                                 <button onclick="sendEmoji('🔥'); event.stopPropagation();" class="emoji-btn" title="Fire">🔥</button>
                                 <button onclick="sendEmoji('😂'); event.stopPropagation();" class="emoji-btn" title="Laugh">😂</button>
                                 <button onclick="sendEmoji('👻'); event.stopPropagation();" class="emoji-btn" title="Ghost">👻</button>
                             </div>
-                            <!-- Controls -->
+                            
                             <div class="d-flex align-items-center control-row gap-2">
                                 <button onclick="seekMusic(-10); event.stopPropagation();" class="control-btn" title="Rewind 10s"><i class="fas fa-backward"></i></button>
                                 <button onclick="sendAction('toggle'); event.stopPropagation();" class="control-btn play-btn" title="Play/Pause"><i class="fas fa-play"></i></button>
@@ -567,7 +567,7 @@
             </ul>
 
             <div class="tab-content tab-content-area" id="myTabContent">
-                <!-- Chat Pane -->
+                
                 <div class="tab-pane fade show active" id="chatPane">
                     <div id="chatMessages"></div>
                     <div class="chat-input-box">
@@ -590,7 +590,7 @@
             </div>
         </div>
     </div>
-    <!-- Bottom spacer to prevent content cutoff -->
+    
     <div class="bottom-spacer"></div>
 </div>
 
@@ -600,6 +600,9 @@
     let notificationTimeout, controlsTimeout, codeRevealTimeout;
     let unseenMessageCount = 0;
     let isChatTabActive = true;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
 
     function showStep(step) {
         document.getElementById('stepInitial').style.display = 'none';
@@ -609,13 +612,9 @@
         else if (step === 'create') document.getElementById('stepCreate').style.display = 'block';
         else if (step === 'join') document.getElementById('stepJoin').style.display = 'block';
     }
-
-    // Toggle controls on tap/click
     function toggleControls() {
         const container = document.getElementById('videoContainer');
         container.classList.toggle('show-controls');
-
-        // Auto-hide after 3 seconds
         if (controlsTimeout) clearTimeout(controlsTimeout);
         if (container.classList.contains('show-controls')) {
             controlsTimeout = setTimeout(() => {
@@ -813,24 +812,18 @@
     function toggleCode() {
         const d = document.getElementById("roomCodeDisplay");
         const icon = document.getElementById("eyeIcon");
-        
-        // Clear any existing timeout
         if (codeRevealTimeout) clearTimeout(codeRevealTimeout);
         
         if(d.innerText === "****") {
-            // Show code
             d.innerText = actualRoomCode;
             d.classList.replace("code-hidden", "code-visible");
             icon.classList.replace("fa-eye", "fa-eye-slash");
-            
-            // Auto-hide after 8 seconds
             codeRevealTimeout = setTimeout(() => {
                 d.innerText = "****";
                 d.classList.replace("code-visible", "code-hidden");
                 icon.classList.replace("fa-eye-slash", "fa-eye");
             }, 8000);
         } else {
-            // Hide code immediately
             d.innerText = "****";
             d.classList.replace("code-visible", "code-hidden");
             icon.classList.replace("fa-eye-slash", "fa-eye");
@@ -847,8 +840,6 @@
             else if (action === 'join') joinRoom();
         }
     }
-
-    // Chat functions
     function sendChatMessage() {
         const input = document.getElementById('chatInput');
         const msg = input.value.trim();
@@ -868,18 +859,32 @@
         const chatBox = document.getElementById('chatMessages');
         const isMine = user === myName;
         const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
+
+        let messageContent = "";
+        if (typeof message === 'string' && message.startsWith('[VOICE]')) {
+            const audioData = message.substring(7);
+            messageContent = `
+                <div class="voice-message">
+                    <i class="fas fa-microphone text-muted"></i>
+                    <audio controls src="${audioData}"></audio>
+                </div>
+            `;
+        } else if (typeof message === 'string' && message.startsWith('[IMAGE]')) {
+            const imageData = message.substring(7);
+            messageContent = `<img src="${imageData}" class="chat-image" onclick="showImagePreview('${imageData}')">`;
+        } else {
+            messageContent = `<div class="chat-text">${escapeHtml(message)}</div>`;
+        }
+
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-message ${isMine ? 'mine' : 'other'}`;
         msgDiv.innerHTML = `
             <div class="chat-sender">${isMine ? 'You' : user}</div>
-            <div class="chat-text">${escapeHtml(message)}</div>
+            ${messageContent}
             <div class="chat-time">${time}</div>
         `;
         chatBox.appendChild(msgDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
-
-        // Update badge if chat tab is not active and message is from others
         if (!isChatTabActive && !isMine) {
             unseenMessageCount++;
             updateChatBadge();
@@ -891,8 +896,6 @@
         div.textContent = text;
         return div.innerHTML;
     }
-
-    // Update chat badge
     function updateChatBadge() {
         const badge = document.getElementById('chatBadge');
         if (unseenMessageCount > 0) {
@@ -902,22 +905,79 @@
             badge.classList.add('hidden');
         }
     }
-
-    // Clear badge when chat tab is clicked
     document.getElementById('chatTabBtn').addEventListener('click', function() {
         isChatTabActive = true;
         unseenMessageCount = 0;
         updateChatBadge();
     });
-
-    // Track when other tabs are clicked
     document.querySelectorAll('#myTab .nav-link:not(#chatTabBtn)').forEach(btn => {
         btn.addEventListener('click', function() {
             isChatTabActive = false;
         });
     });
 
-    // Fullscreen cursor auto-hide after 2 seconds of inactivity
+    function handleImageSelect(event) {
+        const file = event.target.files[0];
+        if (!file || !currentRoom) return;
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Image too large. Max 5MB.');
+            event.target.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            connection.invoke("SendMessage", currentRoom, myName, `[IMAGE]${reader.result}`);
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+    }
+
+    async function toggleVoiceRecording() {
+        if (!currentRoom) return;
+        const btn = document.getElementById('voiceBtn');
+
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        connection.invoke("SendMessage", currentRoom, myName, `[VOICE]${reader.result}`);
+                    };
+                    reader.readAsDataURL(blob);
+                    stream.getTracks().forEach(t => t.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                btn.classList.remove('btn-outline-secondary');
+                btn.classList.add('btn-danger', 'recording');
+                btn.innerHTML = '<i class="fas fa-stop"></i>';
+            } catch {
+                alert('Microphone access denied.');
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            btn.classList.remove('btn-danger', 'recording');
+            btn.classList.add('btn-outline-secondary');
+            btn.innerHTML = '<i class="fas fa-microphone"></i>';
+        }
+    }
+
+    function showImagePreview(src) {
+        const overlay = document.createElement('div');
+        overlay.className = 'image-preview-overlay';
+        overlay.innerHTML = `<img src="${src}" />`;
+        overlay.onclick = () => overlay.remove();
+        document.body.appendChild(overlay);
+    }
     (function() {
         let cursorTimer;
         const vc = document.getElementById('videoContainer');
@@ -937,20 +997,15 @@
         }
         
         function resetCursorTimer() {
-            // Only run this logic in fullscreen mode
             if (!document.fullscreenElement) return;
             
             showCursorAndBar();
             if (cursorTimer) clearTimeout(cursorTimer);
             cursorTimer = setTimeout(hideCursorAndBar, 2000);
         }
-        
-        // Mouse movement shows cursor/bar and resets timer (only in fullscreen)
         document.addEventListener('mousemove', resetCursorTimer);
         document.addEventListener('mousedown', resetCursorTimer);
         document.addEventListener('touchstart', resetCursorTimer);
-        
-        // On fullscreen change
         document.addEventListener('fullscreenchange', function() {
             if (document.fullscreenElement) {
                 resetCursorTimer();

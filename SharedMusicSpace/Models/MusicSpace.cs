@@ -55,8 +55,6 @@ namespace SharedMusicSpace.Models
             {
                 Playlist.Add(newSong);
                 OnPlaylistChanged?.Invoke(Playlist);
-
-                // Simple English message (fast response)
                 OnStatusChanged?.Invoke("added a new song", "info", new { User = userName });
             }
         }
@@ -72,8 +70,6 @@ namespace SharedMusicSpace.Models
             else PausedPosition = TimeSpan.FromSeconds(newPos);
 
             OnSeekChanged?.Invoke(newPos);
-
-            // Simple message
             string action = offsetSeconds > 0 ? "forwarded" : "rewound";
             OnStatusChanged?.Invoke(action, "info", new { User = requestorName });
         }

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using SharedMusicSpace.Models;
 
@@ -18,11 +18,6 @@ namespace SharedMusicSpace.Controllers
             return View();
         }
 
-        //public IActionResult Privacy()
-        //{
-        //    return View();
-        //}
-
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
@@ -30,3 +25,4 @@ namespace SharedMusicSpace.Controllers
         }
     }
 }
+

@@ -1,4 +1,4 @@
-namespace SharedMusicSpace.Models
+﻿namespace SharedMusicSpace.Models
 {
     public class ErrorViewModel
     {
@@ -7,3 +7,4 @@ namespace SharedMusicSpace.Models
         public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
     }
 }
+
