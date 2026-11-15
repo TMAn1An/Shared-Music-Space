@@ -160,19 +160,27 @@ el.code.addEventListener('input', () => {
   el.code.value = (fromLink ?? raw).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 });
 
-el.form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+async function submitLobby(action) {
   if (state.busy) return;
-  let action = e.submitter?.dataset.action ?? 'create';
-  if (inviteCode || document.activeElement === el.code) action = 'join';
-
   const name = el.name.value.trim();
   if (!name) return showLobbyError('Pick a nickname so your friends know who you are.', el.name);
   if (action === 'join' && !el.code.value.trim()) return showLobbyError('Enter the 6-character room code.', el.code);
 
   store.set('ms.name', name);
   await enterRoom(action, name, el.code.value);
+}
+
+el.form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  // Enter key → implicit submit. On an invite page, or while typing a code, that means "join".
+  const joining = inviteCode || document.activeElement === el.code || e.submitter?.dataset.action === 'join';
+  submitLobby(joining ? 'join' : 'create');
 });
+// On an invite page the secondary "Create a room" button must really create, not join.
+if (inviteCode) {
+  el.createBtn.type = 'button';
+  el.createBtn.addEventListener('click', () => submitLobby('create'));
+}
 
 async function enterRoom(action, name, code) {
   setBusy(true);
