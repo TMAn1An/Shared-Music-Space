@@ -1,0 +1,5 @@
+SharedMusicSpace.Tests
+SharedMusicSpace/bin
+SharedMusicSpace/obj
+Dockerfile
+render.yaml

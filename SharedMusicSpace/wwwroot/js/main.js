@@ -54,7 +54,7 @@ const el = {
    Connection
    ========================================================================== */
 const conn = new signalR.HubConnectionBuilder()
-  .withUrl('/musicHub')
+  .withUrl(`${(window.MUSIC_SPACE_API || '').replace(/\/$/, '')}/musicHub`)
   .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (ctx) => Math.min(1000 * (ctx.previousRetryCount + 1), 8000) })
   .configureLogging(signalR.LogLevel.Warning)
   .build();
