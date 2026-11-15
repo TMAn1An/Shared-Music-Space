@@ -1,0 +1,36 @@
+# Music Space
+
+Listen to YouTube music in perfect sync with friends. Create a room, share the invite link, queue songs, chat and react together.
+
+**Stack:** ASP.NET Core 8 · SignalR · YoutubeExplode · vanilla ES modules + hand-written CSS (no build step, no jQuery/Bootstrap).
+
+## Run
+
+```bash
+dotnet run --project SharedMusicSpace      # http://localhost:5271
+dotnet test                                # room logic unit tests
+docker build -t music-space . && docker run -p 8080:8080 music-space
+```
+
+## Features
+
+- Server-authoritative playback: play/pause/seek/skip are the same for everyone; late joiners and reconnects land on the exact second
+- Invite links (`/r/ABC123`), room codes, automatic seat restore after a page reload or network drop
+- Search YouTube or paste a link; queue, "play next", remove, recently played
+- Live chat with history, floating emoji reactions, host crown (auto-transfers when the host leaves)
+- Unplayable/blocked videos are skipped automatically; the server advances stuck songs on its own
+- Keyboard shortcuts: `Space` play/pause · `←/→` ±10s · `M` mute · `F` fullscreen; media-key / lock-screen controls
+- Responsive: split view on desktop, thumb-friendly bottom tabs on phones
+
+## How it works
+
+```
+Domain/Room.cs        all room state + rules (thread-safe, unit-tested)
+Services/             RoomService (registry), YouTubeService (search + metadata w/ fallbacks), RoomSweeper (housekeeping)
+Hubs/MusicHub.cs      SignalR API; identity comes from the connection, never from client-sent names
+wwwroot/js/           main.js (UI), player.js (YouTube player locked to the server clock), dom.js (XSS-safe helpers)
+```
+
+The server stores `{song, playing, position@time}`. Clients extrapolate the playhead from that and nudge the YouTube iframe whenever it drifts more than ~1.5s.
+
+> Rooms live in memory: restarting the server ends all rooms. Scale-out would need a SignalR backplane and shared room store.
