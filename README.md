@@ -12,6 +12,17 @@ dotnet test                                # room logic unit tests
 docker build -t music-space . && docker run -p 8080:8080 music-space
 ```
 
+## Deploy your own
+
+SignalR needs a long-lived server, so the app has two parts. Serverless hosts alone (including Vercel) can't run the backend.
+
+| Part | Where | How |
+|---|---|---|
+| **Backend** (ASP.NET + SignalR) | Render, Fly.io, Railway, any Docker host | Build the root `Dockerfile`. Set `ALLOWED_ORIGINS` to your frontend URL. Health check: `/healthz`. A Render blueprint is in `deploy/render.yaml`. |
+| **Frontend** (static) | Vercel, Netlify, or the backend itself | On Vercel: import the repo and set `BACKEND_URL=https://your-backend` (build runs `scripts/vercel-build.mjs`). |
+
+The simplest option is a single Docker host: the backend also serves the frontend, so no extra configuration is needed.
+
 ## Features
 
 - Server-authoritative playback: play/pause/seek/skip are the same for everyone; late joiners and reconnects land on the exact second
@@ -33,5 +44,9 @@ wwwroot/js/           main.js (UI), player.js (YouTube player locked to the serv
 ```
 
 The server stores `{song, playing, position@time}`. Clients extrapolate the playhead from that and nudge the YouTube iframe whenever it drifts more than ~1.5s.
+
+## Legal note
+
+Playback uses YouTube's official embedded player. Search and metadata lookups use [YoutubeExplode](https://github.com/Tyrrrz/YoutubeExplode), which scrapes YouTube and may break or be rate-limited at any time (the app falls back to oEmbed for titles). Check YouTube's terms before running a public instance. Licensed under [MIT](LICENSE); see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 > Rooms live in memory: restarting the server ends all rooms. Scale-out would need a SignalR backplane and shared room store.
