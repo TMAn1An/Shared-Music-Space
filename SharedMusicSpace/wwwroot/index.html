@@ -8,6 +8,8 @@
   <meta name="description" content="Listen to YouTube music in perfect sync with friends. Create a room, share the link, press play together.">
   <title>Music Space — listen together</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/favicon.svg">
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
@@ -71,7 +73,7 @@
           <div class="or"><span>or join with a code</span></div>
 
           <div class="join-row">
-            <input id="codeInput" class="input code-input" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123" aria-label="Room code">
+            <input id="codeInput" class="input code-input" type="text" maxlength="80" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code or invite link" aria-label="Room code or invite link">
             <button type="submit" class="btn btn-secondary btn-lg" id="joinBtn" data-action="join" disabled>Join</button>
           </div>
         </div>
@@ -119,8 +121,11 @@
         <div class="empty-stage" id="emptyStage">
           <div class="empty-art"><svg class="icon"><use href="#i-music"/></svg></div>
           <h3>Nothing playing yet</h3>
-          <p>Search for a song or paste a YouTube link to get the party started.</p>
-          <button class="btn btn-primary" id="emptyAddBtn" type="button"><svg class="icon"><use href="#i-plus"/></svg>Add a song</button>
+          <p>Add a song, then invite your friends — everyone hears it at the same moment.</p>
+          <div class="empty-actions">
+            <button class="btn btn-primary" id="emptyAddBtn" type="button"><svg class="icon"><use href="#i-plus"/></svg>Add a song</button>
+            <button class="btn btn-secondary" id="emptyInviteBtn" type="button"><svg class="icon"><use href="#i-link"/></svg>Invite friends</button>
+          </div>
         </div>
 
         <button class="tap-play" id="tapPlay" type="button" hidden>

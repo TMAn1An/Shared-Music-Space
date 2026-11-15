@@ -138,8 +138,13 @@ player.setMuted(store.get('ms.muted') === '1');
    ========================================================================== */
 const inviteCode = (location.pathname.match(/^\/r\/([A-Za-z0-9]{4,12})/)?.[1] ?? '').toUpperCase();
 
+const ADJECTIVES = ['Happy', 'Groovy', 'Chill', 'Cosmic', 'Funky', 'Sunny', 'Mellow', 'Electric', 'Lucky', 'Velvet', 'Neon', 'Dreamy'];
+const ANIMALS = ['Panda', 'Otter', 'Falcon', 'Koala', 'Tiger', 'Dolphin', 'Fox', 'Owl', 'Penguin', 'Llama', 'Gecko', 'Raven'];
+const randomNick = () => `${ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]} ${ANIMALS[Math.floor(Math.random() * ANIMALS.length)]}`;
+
 function initLobby() {
-  el.name.value = store.get('ms.name') ?? '';
+  // Returning visitors get their old name; first-timers get a fun suggestion so they can start with one click.
+  el.name.value = store.get('ms.name') ?? randomNick();
   if (inviteCode) {
     el.lobby.classList.add('invited');
     el.code.value = inviteCode;
@@ -147,9 +152,15 @@ function initLobby() {
     el.inviteNote.append('You’ve been invited to room ', h('strong', { text: inviteCode }), '. Pick a nickname and hop in.');
   }
   el.name.focus({ preventScroll: true });
+  el.name.select();
 }
 
-el.code.addEventListener('input', () => { el.code.value = el.code.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+// Accept a bare code or a pasted invite link — whichever the friend sent.
+el.code.addEventListener('input', () => {
+  const raw = el.code.value;
+  const fromLink = raw.match(/\/r\/([A-Za-z0-9]{4,12})/)?.[1];
+  el.code.value = (fromLink ?? raw).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+});
 
 el.form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -368,7 +379,13 @@ function renderQueue() {
 }
 
 function renderPeople() {
-  const nodes = [h('div', { class: 'section-head', text: `In this room · ${state.room.members.length}` })];
+  const nodes = [];
+  if (state.room.members.length === 1) {
+    nodes.push(h('div', { class: 'invite-card' },
+      h('p', {}, h('strong', { text: 'It’s just you here' }), 'Send the invite link so friends can join and listen along.'),
+      h('button', { class: 'btn btn-primary btn-sm', type: 'button', onclick: shareInvite }, icon('link'), 'Invite')));
+  }
+  nodes.push(h('div', { class: 'section-head', text: `In this room · ${state.room.members.length}` }));
   for (const m of state.room.members) {
     nodes.push(h('div', { class: 'person' },
       avatar(m.name),
@@ -612,13 +629,15 @@ async function copy(text, okMsg) {
   toast(okMsg);
 }
 $('#codeBtn').addEventListener('click', () => copy(state.room.code, 'Room code copied'));
-$('#inviteBtn').addEventListener('click', async () => {
+async function shareInvite() {
   const url = `${location.origin}/r/${state.room.code}`;
   if (navigator.share && matchMedia('(pointer: coarse)').matches) {
     try { await navigator.share({ title: 'Join my Music Space', text: `Listen with me in ${state.room.name}`, url }); return; } catch { /* cancelled → fall back to copy */ }
   }
   copy(url, 'Invite link copied — send it to your friends');
-});
+}
+$('#inviteBtn').addEventListener('click', shareInvite);
+$('#emptyInviteBtn').addEventListener('click', shareInvite);
 
 /* ==========================================================================
    Keyboard shortcuts & lock-screen controls
@@ -649,8 +668,19 @@ if ('mediaSession' in navigator) {
   bind('nexttrack', () => call('Skip'));
 }
 
+// Keep phone screens awake while music plays so the room doesn't fall asleep.
+let wakeLock = null;
+async function syncWakeLock() {
+  const want = !!playback()?.playing && !document.hidden && !!navigator.wakeLock;
+  try {
+    if (want && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+    else if (!want && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { /* denied (battery saver etc.) — not critical */ }
+}
+setInterval(syncWakeLock, 4000);
+
 // Re-sync immediately when the tab becomes visible again (mobile browsers throttle timers).
-document.addEventListener('visibilitychange', () => { if (!document.hidden) player.reconcile(true); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { player.reconcile(true); syncWakeLock(); } });
 
 /* ==========================================================================
    Boot

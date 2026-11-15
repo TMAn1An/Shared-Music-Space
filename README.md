@@ -20,6 +20,7 @@ docker build -t music-space . && docker run -p 8080:8080 music-space
 - Live chat with history, floating emoji reactions, host crown (auto-transfers when the host leaves)
 - Unplayable/blocked videos are skipped automatically; the server advances stuck songs on its own
 - Keyboard shortcuts: `Space` play/pause · `←/→` ±10s · `M` mute · `F` fullscreen; media-key / lock-screen controls
+- Easy start: a fun nickname is pre-filled, join with a code or a pasted invite link, one-tap "Invite friends", installable as an app (PWA), screen stays awake while playing
 - Responsive: split view on desktop, thumb-friendly bottom tabs on phones
 
 ## How it works

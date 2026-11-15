@@ -203,6 +203,10 @@ button { cursor: pointer; }
 .empty-stage { background: radial-gradient(80% 80% at 50% 0%, rgb(139 92 246 / .22), transparent 70%), #0d0d16; }
 .empty-stage h3 { font-size: 1.2rem; letter-spacing: -.01em; }
 .empty-stage p { color: var(--muted); max-width: 34ch; font-size: .92rem; margin-bottom: .4rem; }
+.empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; }
+.invite-card { display: flex; align-items: center; gap: 12px; margin: 12px 12px 0; padding: 12px 14px; border-radius: var(--r-md); background: linear-gradient(135deg, rgb(139 92 246 / .16), rgb(236 72 153 / .1)); border: 1px solid rgb(139 92 246 / .35); }
+.invite-card p { flex: 1; font-size: .85rem; color: var(--muted); }
+.invite-card strong { display: block; color: var(--text); font-size: .92rem; }
 .empty-art { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 20px; background: var(--surface-2); border: 1px solid var(--border); color: var(--pink); }
 .empty-art .icon { width: 28px; height: 28px; }
 .tap-play { background: rgb(9 9 15 / .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 0; color: #fff; font-weight: 600; cursor: pointer; }
@@ -350,6 +354,11 @@ button { cursor: pointer; }
 @media (max-width: 860px) {
   .room { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "top" "stage" "panel"; }
   .hide-sm { display: none; }
+  .empty-stage { gap: .35rem; padding: 1rem; }
+  .empty-art { display: none; }
+  .empty-stage h3 { font-size: 1.05rem; }
+  .empty-stage p { font-size: .85rem; margin-bottom: .3rem; }
+  .empty-actions .btn { padding: .5rem .85rem; font-size: .9rem; }
   .topbar { padding: 8px 12px; gap: 8px; }
   .topbar-right { gap: 4px; }
   .room-sub { white-space: nowrap; }
