@@ -165,6 +165,8 @@ button { cursor: pointer; }
 .conn-status.ok .dot { background: var(--ok); box-shadow: 0 0 0 3px rgb(52 211 153 / .2); animation: none; }
 .conn-status.bad .dot { background: var(--danger); box-shadow: 0 0 0 3px rgb(251 113 133 / .2); animation: none; }
 @keyframes pulse { 50% { opacity: .35; } }
+.p2p-note { display: none; font-size: .78rem; color: var(--faint); text-align: center; text-wrap: balance; }
+body.p2p .p2p-note { display: block; }
 .perks { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem 1.1rem; color: var(--muted); font-size: .85rem; }
 .perks li { display: inline-flex; align-items: center; gap: .4rem; }
 .perks .icon { color: var(--pink); }
@@ -301,6 +303,13 @@ button { cursor: pointer; }
 .searchbar .icon { color: var(--faint); }
 .searchbar .input { border: 0; background: transparent; padding: .5rem 0; box-shadow: none !important; }
 .searchbar .input:focus { background: transparent; }
+
+.search-settings { display: none; margin: 0 12px 4px; padding: .6rem .8rem; border-radius: var(--r-md); background: var(--surface); border: 1px solid var(--border); font-size: .82rem; color: var(--muted); }
+body.p2p .search-settings { display: block; }
+.search-settings summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.search-settings p { margin: .5rem 0; }
+.search-settings a { color: #c4b5fd; }
+.key-row { display: flex; gap: 8px; }
 
 /* track rows (search, queue, history) */
 .track { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: var(--r-md); transition: background-color .15s; }

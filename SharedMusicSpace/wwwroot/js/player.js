@@ -127,6 +127,9 @@ export class SyncPlayer {
     this.reconcile(true);
   }
 
+  duration() { return this.#ready ? this.#player.getDuration?.() ?? 0 : 0; }
+  title() { return this.#ready ? this.#player.getVideoData?.().title ?? '' : ''; }
+
   setVolume(v) { this.#volume = v; this.#applyVolume(); }
   setMuted(m) { this.#muted = m; this.#applyVolume(); }
   get volume() { return this.#volume; }

@@ -80,6 +80,7 @@
 
         <p class="form-error" id="lobbyError" role="alert" hidden></p>
         <p class="conn-status" id="connStatus"><span class="dot"></span><span id="connText">Connecting to server…</span></p>
+        <p class="p2p-note">Serverless mode: your room lives in the host’s browser, so the host should keep their tab open. If they leave, the next person takes over automatically.</p>
       </form>
 
       <ul class="perks">
@@ -192,6 +193,14 @@
             <input id="searchInput" class="input" type="search" placeholder="Search songs or paste a YouTube link" aria-label="Search songs or paste a link" autocomplete="off" enterkeyhint="search">
             <button class="btn btn-primary btn-sm" type="submit">Search</button>
           </form>
+          <details class="search-settings" id="searchSettings">
+            <summary>Search settings</summary>
+            <p>Serverless mode can’t scrape YouTube. Paste a link, or add your own free <a href="https://developers.google.com/youtube/v3/getting-started" target="_blank" rel="noopener">YouTube Data API key</a> to enable search (stored only in this browser).</p>
+            <div class="key-row">
+              <input id="ytKey" class="input" type="password" placeholder="AIza…" autocomplete="off" aria-label="YouTube Data API key">
+              <button class="btn btn-secondary btn-sm" id="saveKey" type="button">Save</button>
+            </div>
+          </details>
           <div class="scroll" id="searchResults"></div>
         </section>
 

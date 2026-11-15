@@ -1,5 +1,6 @@
 import { $, h, icon, setIcon, formatTime, thumbUrl, avatar, toast, paintRange } from './dom.js';
 import { SyncPlayer } from './player.js';
+import { chooseBackend } from './backend.js';
 
 /* ==========================================================================
    State
@@ -53,11 +54,8 @@ const el = {
 /* ==========================================================================
    Connection
    ========================================================================== */
-const conn = new signalR.HubConnectionBuilder()
-  .withUrl(`${(window.MUSIC_SPACE_API || '').replace(/\/$/, '')}/musicHub`)
-  .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (ctx) => Math.min(1000 * (ctx.previousRetryCount + 1), 8000) })
-  .configureLogging(signalR.LogLevel.Warning)
-  .build();
+const conn = await chooseBackend();
+const p2p = conn.mode === 'p2p';
 
 const call = (method, ...args) => conn.invoke(method, ...args);
 
@@ -282,7 +280,7 @@ function renderAll() {
   if (!r) return;
   el.roomName.textContent = r.name;
   el.codeText.textContent = r.code;
-  el.roomSub.replaceChildren(h('span', { class: 'live-dot' }), `${r.members.length} listening`);
+  el.roomSub.replaceChildren(h('span', { class: 'live-dot' }), `${r.members.length} listening${p2p ? ' · serverless' : ''}`);
   renderNowPlaying();
   renderQueue();
   renderPeople();
@@ -446,6 +444,7 @@ el.searchForm.addEventListener('submit', async (e) => {
   } catch (err) {
     state.results = [];
     toast(err?.message?.split(': ').pop() || 'Search failed. Try again.', 'error');
+    if (p2p) $('#searchSettings').open = true;
   } finally {
     state.searching = false;
     renderSearch();
@@ -683,13 +682,41 @@ setInterval(syncWakeLock, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { player.reconcile(true); syncWakeLock(); } });
 
 /* ==========================================================================
+   Serverless-mode extras
+   ========================================================================== */
+if (p2p) {
+  // Search settings: the optional personal YouTube Data API key lives only in this browser.
+  const keyInput = $('#ytKey');
+  keyInput.value = store.get('ms.ytkey') ?? '';
+  $('#saveKey').addEventListener('click', () => {
+    store.set('ms.ytkey', keyInput.value.trim());
+    toast(keyInput.value.trim() ? 'Key saved in this browser' : 'Key removed');
+  });
+  conn.on('integrity', (msg) => toast(msg, 'error'));
+  conn.on('kicked', () => { toast('You were removed from the room.', 'error'); leaveLocally(); });
+
+  // Without a server nobody knows a pasted video's length: the first player to load it reports it.
+  const reported = new Set();
+  setInterval(() => {
+    const s = song();
+    if (!s || s.duration || reported.has(s.id)) return;
+    const d = player.duration();
+    if (d > 0) { reported.add(s.id); call('SongMeta', s.id, d, player.title()).catch(() => {}); }
+  }, 1500);
+
+  // Leaving politely lets the room hand over to someone else.
+  addEventListener('pagehide', () => { if (state.room) conn.invoke('LeaveRoom'); });
+}
+
+/* ==========================================================================
    Boot
    ========================================================================== */
 initLobby();
 setConn('', 'Connecting to server…');
 
 connect().then(async () => {
-  setConn('ok', 'Connected');
+  setConn('ok', p2p ? (conn.local ? 'Ready · same-browser demo mode' : 'Ready · peer-to-peer, no server') : 'Connected');
+  document.body.classList.toggle('p2p', p2p);
   setBusy(false);
 
   // Page reload while inside a room → quietly take our seat back.

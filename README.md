@@ -8,13 +8,36 @@ Listen to YouTube music in perfect sync with friends. Create a room, share the i
 
 ```bash
 dotnet run --project SharedMusicSpace      # http://localhost:5271
-dotnet test                                # room logic unit tests
+dotnet test                                # server room logic
+node --test tests-js/*.test.mjs            # serverless engine (Node 22+)
 docker build -t music-space . && docker run -p 8080:8080 music-space
 ```
 
+## Two ways to run it
+
+| | **Server mode** | **Serverless mode** (peer-to-peer) |
+|---|---|---|
+| Needs a backend | ASP.NET + SignalR | **No** — static files only (Vercel, Netlify, GitHub Pages…) |
+| Room lives in | the server's memory | the **host's browser** |
+| Host leaves | room unaffected | next member takes over automatically (failover) |
+| Search | works out of the box | paste a link, or add your own free YouTube API key |
+| Room size | large | small groups (≤ 12) |
+
+The app picks the mode on its own: if a backend answers at `/healthz` (or `config.js` names one) it uses server mode, otherwise it runs serverless. Force one with `window.MUSIC_SPACE_MODE = 'server' | 'p2p'` in `config.js`. Open the site with `?p2p=local` to try serverless mode between tabs of one browser, with no network.
+
+### How serverless mode works
+
+- **Transport:** WebRTC data channels. Peers find each other through public BitTorrent trackers using [Trystero](https://github.com/dmotz/trystero) (vendored in `wwwroot/vendor`). Traffic is end-to-end encrypted by WebRTC; we run nothing.
+- **Host-ordered log:** the host applies every command with the same rules as the server (`js/core/room.js`), appends it to a **hash-chained log** (`js/core/chain.js`) and broadcasts the new state. Every entry commits to the previous one, so peers can detect rewritten, dropped or reordered history, including across a host change.
+- **Identity:** each browser tab holds an ECDSA key pair. Your member id is derived from your public key and every command is **signed**; the host rejects forged and replayed commands (`js/core/identity.js`).
+- **Failover:** every peer holds a replica of the room. If the host disappears, the oldest reachable member promotes itself and the chain continues from the last entry everyone already verified.
+- **Limits:** the host's tab must stay open; rooms vanish when everyone leaves; strict corporate networks may need a TURN server (pass `rtcConfig` via `window.MUSIC_SPACE_P2P` in `config.js`); public tracker relays are best-effort.
+
+There is deliberately no token, mining or consensus: a single host orders events, so a hash chain plus signatures is all the "blockchain" this needs.
+
 ## Deploy your own
 
-SignalR needs a long-lived server, so the app has two parts. Serverless hosts alone (including Vercel) can't run the backend.
+**Serverless mode:** just host `SharedMusicSpace/wwwroot` on any static host (on Vercel, import the repo and leave `BACKEND_URL` unset). **Server mode:** SignalR needs a long-lived server, so serverless hosts such as Vercel can't run that backend.
 
 | Part | Where | How |
 |---|---|---|
