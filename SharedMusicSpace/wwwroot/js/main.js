@@ -852,6 +852,19 @@ setInterval(syncWakeLock, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { player.reconcile(true); syncWakeLock(); } });
 
 /* ==========================================================================
+   Unknown lengths (both modes)
+   Looking a pasted link up can fail (YouTube rate-limits server IPs, serverless mode has no server at all),
+   so a song may arrive without a duration. The first player to load it knows the truth and reports it once.
+   ========================================================================== */
+const reportedLengths = new Set();
+setInterval(() => {
+  const s = song();
+  if (!s || s.duration || reportedLengths.has(s.id)) return;
+  const d = player.duration();
+  if (d > 0) { reportedLengths.add(s.id); call('SongMeta', s.id, d, player.title()).catch(() => {}); }
+}, 1500);
+
+/* ==========================================================================
    Serverless-mode extras
    ========================================================================== */
 if (p2p) {
@@ -864,15 +877,6 @@ if (p2p) {
   });
   conn.on('integrity', (msg) => toast(msg, 'error'));
   conn.on('kicked', () => { toast('You were removed from the room.', 'error'); leaveLocally(); });
-
-  // Without a server nobody knows a pasted video's length: the first player to load it reports it.
-  const reported = new Set();
-  setInterval(() => {
-    const s = song();
-    if (!s || s.duration || reported.has(s.id)) return;
-    const d = player.duration();
-    if (d > 0) { reported.add(s.id); call('SongMeta', s.id, d, player.title()).catch(() => {}); }
-  }, 1500);
 
   // Leaving politely lets the room hand over to someone else.
   addEventListener('pagehide', () => { if (state.room) conn.invoke('LeaveRoom'); });

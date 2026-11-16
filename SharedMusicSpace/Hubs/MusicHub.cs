@@ -164,6 +164,13 @@ public sealed class MusicHub(RoomService rooms, YouTubeService youtube, TimeProv
         if (room != null && room.TrackEnded(videoId)) await Broadcast(room);
     }
 
+    /// <summary>The first player to load a video of unknown length reports its real duration (and title).</summary>
+    public async Task SongMeta(string videoId, double duration, string? title)
+    {
+        var (room, _) = Resolve();
+        if (room != null && room.SetDuration(videoId ?? "", duration, title)) await Broadcast(room);
+    }
+
     public async Task Unplayable(string videoId)
     {
         var (room, _) = Resolve();

@@ -54,7 +54,7 @@ Open the smiley menu on the video and press the eye icon to hide everyone's reac
 
 ## Titles show "YouTube video …" or the seek bar is disabled
 
-The video's metadata couldn't be loaded (rate limit or offline lookup service). In serverless mode the first listener's player reports the real title and length shortly after the video starts, and the bar becomes active.
+The video's metadata couldn't be loaded (YouTube rate-limiting the server, or an offline lookup service). The first listener's player reports the real title and length shortly after the video starts, and the bar becomes active. If it stays `--:--`, nobody's player has started the video yet (autoplay blocked? tap "Tap to start listening").
 
 ## "The room history doesn't line up"
 
