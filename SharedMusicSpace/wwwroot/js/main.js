@@ -34,7 +34,8 @@ const state = {
 };
 
 const el = {
-  lobby: $('#lobby'), room: $('#room'), stage: $('#stage'),
+  lobby: $('#lobby'), room: $('#room'), stage: $('#stage'), frame: $('#videoFrame'), overlay: $('#overlay'),
+  reactBtn: $('#reactBtn'), reactMenu: $('#reactMenu'),
   form: $('#lobbyForm'), name: $('#nameInput'), code: $('#codeInput'),
   createBtn: $('#createBtn'), joinBtn: $('#joinBtn'), error: $('#lobbyError'),
   connStatus: $('#connStatus'), connText: $('#connText'), inviteNote: $('#inviteNote'),
@@ -272,7 +273,7 @@ conn.on('chat', (msg) => {
   }
 });
 
-conn.on('reaction', (name, emoji) => floatReaction(emoji, name === state.me?.name ? 'You' : name));
+conn.on('reaction', (name, emoji) => { if (name !== state.me?.name) floatReaction(emoji, name); }); // our own float instantly on tap
 
 /* ==========================================================================
    Rendering
@@ -317,6 +318,8 @@ function renderNowPlaying() {
   el.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   setIcon(el.play, playing ? 'pause' : 'play');
   if (!hasSong) { el.seek.value = 0; paintRange(el.seek); el.timeNow.textContent = '0:00'; }
+  el.frame.classList.toggle('no-song', !hasSong);
+  syncOverlay(playing);
 
   if (s) el.ambient.style.setProperty('--art', `url(${thumbUrl(s.id)})`);
   el.ambient.classList.toggle('has-art', hasSong);
@@ -505,16 +508,35 @@ el.chatForm.addEventListener('submit', (e) => {
   call('SendChat', text).catch(() => toast('Message not sent.', 'error'));
 });
 
-/* ---------- reactions ---------- */
-const reactionBar = $('#reactionBar');
-for (const emoji of REACTIONS) {
-  reactionBar.append(h('button', { class: 'react-btn', type: 'button', 'aria-label': `React ${emoji}`, onclick: () => call('React', emoji).catch(() => {}) }, emoji));
+/* ---------- reactions: tucked behind one icon, floating emoji are smooth ---------- */
+REACTIONS.forEach((emoji, i) => {
+  el.reactMenu.append(h('button', {
+    class: 'react-btn', type: 'button', 'aria-label': `React ${emoji}`, style: `--i:${i}`,
+    onclick: () => { floatReaction(emoji, 'You'); call('React', emoji).catch(() => {}); setMenu(true); }, // instant for the sender
+  }, emoji));
+});
+
+let menuTimer;
+const menuOpen = () => el.reactMenu.classList.contains('open');
+function setMenu(open) {
+  el.reactMenu.classList.toggle('open', open);
+  el.reactBtn.setAttribute('aria-expanded', String(open));
+  clearTimeout(menuTimer);
+  if (open) { menuTimer = setTimeout(() => setMenu(false), 4500); showOverlay(); } else armOverlay();
 }
+el.reactBtn.addEventListener('click', () => setMenu(!menuOpen()));
+document.addEventListener('pointerdown', (e) => { if (menuOpen() && !e.target.closest('.react-wrap')) setMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen()) { setMenu(false); el.reactBtn.focus(); } });
 
 function floatReaction(emoji, who) {
-  const node = h('div', { class: 'float-react', style: { left: `${10 + Math.random() * 78}%` } }, h('b', { text: emoji }), h('span', { text: who }));
-  node.addEventListener('animationend', () => node.remove());
-  el.reactionsLayer.append(node);
+  const layer = el.reactionsLayer;
+  while (layer.children.length >= 36) layer.firstElementChild.remove();
+  const node = h('div', { class: 'float-react', style: { left: `${8 + Math.random() * 80}%` } }, h('b', { text: emoji }), h('span', { text: who }));
+  node.style.setProperty('--rise', `${Math.round(layer.clientHeight * (0.55 + Math.random() * 0.25))}px`);
+  node.style.setProperty('--sway', `${10 + Math.random() * 16}px`);
+  node.style.animationDuration = `${3 + Math.random() * 0.8}s`;
+  node.addEventListener('animationend', (e) => { if (e.target === node) node.remove(); });
+  layer.append(node);
 }
 
 /* ==========================================================================
@@ -580,22 +602,52 @@ setInterval(() => {
   paintRange(el.seek);
 }, 250);
 
-/* fullscreen */
-const fullBtn = $('#fullBtn');
-if (!el.stage.requestFullscreen) fullBtn.hidden = true;
-fullBtn.addEventListener('click', toggleFullscreen);
-function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else el.stage.requestFullscreen?.().catch(() => {});
+/* ---------- YouTube-style overlay: visible when paused or touched, fades while music plays ---------- */
+const frame = el.frame;
+const coarse = matchMedia('(pointer: coarse)');
+let overlayTimer = 0;
+
+const overlayMustStay = () => !song() || !playback()?.playing || menuOpen() || !!frame.querySelector(':focus-visible');
+function armOverlay() {
+  clearTimeout(overlayTimer);
+  if (overlayMustStay()) return;
+  overlayTimer = setTimeout(() => { if (!overlayMustStay()) frame.classList.add('idle'); }, 3000);
 }
-let idleTimer;
-const wake = () => {
-  el.stage.classList.remove('idle');
-  clearTimeout(idleTimer);
-  if (document.fullscreenElement) idleTimer = setTimeout(() => el.stage.classList.add('idle'), 2500);
-};
-for (const ev of ['mousemove', 'pointerdown', 'touchstart', 'keydown']) el.stage.addEventListener(ev, wake, { passive: true });
-document.addEventListener('fullscreenchange', wake);
+function showOverlay() { frame.classList.remove('idle'); armOverlay(); }
+function hideOverlayNow() { clearTimeout(overlayTimer); if (!overlayMustStay()) frame.classList.add('idle'); }
+function syncOverlay(playing) {
+  if (!playing || !song()) { clearTimeout(overlayTimer); frame.classList.remove('idle'); }
+  else if (!frame.classList.contains('idle')) armOverlay();
+}
+
+frame.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') showOverlay(); });
+frame.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') { clearTimeout(overlayTimer); overlayTimer = setTimeout(hideOverlayNow, 700); } });
+el.overlay.addEventListener('pointerdown', showOverlay);
+el.overlay.addEventListener('input', showOverlay);
+$('.video-shield').addEventListener('click', () => {
+  if (!song()) return;
+  if (coarse.matches) {
+    // Touch, like YouTube mobile: a tap reveals the controls, another tap hides them.
+    if (frame.classList.contains('idle') || !playback().playing) showOverlay(); else hideOverlayNow();
+  } else { call('TogglePlay'); showOverlay(); } // mouse: click the video to play/pause
+});
+
+/* ---------- fullscreen: the video frame itself fills the screen (with a CSS fallback for iPhone) ---------- */
+const fullBtn = $('#fullBtn');
+const isFull = () => document.fullscreenElement === frame || frame.classList.contains('pseudo-full');
+async function toggleFullscreen() {
+  if (isFull()) {
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    frame.classList.remove('pseudo-full');
+    screen.orientation?.unlock?.();
+  } else if (frame.requestFullscreen) {
+    try { await frame.requestFullscreen({ navigationUI: 'hide' }); screen.orientation?.lock?.('landscape').catch(() => {}); }
+    catch { frame.classList.add('pseudo-full'); }
+  } else frame.classList.add('pseudo-full'); // browsers without element fullscreen (iPhone Safari)
+  showOverlay();
+}
+fullBtn.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) screen.orientation?.unlock?.(); showOverlay(); });
 
 /* ==========================================================================
    Tabs
@@ -651,6 +703,7 @@ $('#emptyInviteBtn').addEventListener('click', shareInvite);
    ========================================================================== */
 document.addEventListener('keydown', (e) => {
   if (!state.room || e.ctrlKey || e.metaKey || e.altKey) return;
+  showOverlay();
   const t = e.target;
   if (t.matches('input, textarea, select, [contenteditable], [role=tab]')) return;
   if (e.key === ' ' && !t.matches('button')) { e.preventDefault(); if (song()) call('TogglePlay'); }

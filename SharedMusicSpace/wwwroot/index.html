@@ -39,6 +39,7 @@
       <symbol id="i-top" viewBox="0 0 24 24"><path d="M5 3h14M18 13l-6-6-6 6M12 7v14"/></symbol>
       <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></symbol>
       <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+      <symbol id="i-smile" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9.5h.01M15 9.5h.01" stroke-width="2.6"/></symbol>
       <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9Z"/></symbol>
       <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
     </defs>
@@ -135,6 +136,35 @@
         </button>
 
         <div class="reactions-layer" id="reactionsLayer" aria-hidden="true"></div>
+
+        <!-- YouTube-style controls: shown when paused or on interaction, fade away while music plays -->
+        <div class="overlay" id="overlay">
+          <div class="seek">
+            <span id="timeNow" class="time">0:00</span>
+            <input id="seekBar" class="range seek-range" type="range" min="0" max="100" step="1" value="0" aria-label="Seek" disabled>
+            <span id="timeTotal" class="time">0:00</span>
+          </div>
+
+          <div class="controls">
+            <div class="controls-side start">
+              <button class="icon-btn" id="muteBtn" type="button" aria-label="Mute" title="Mute (M)"><svg class="icon"><use href="#i-vol"/></svg></button>
+              <input id="volume" class="range volume" type="range" min="0" max="100" step="1" value="80" aria-label="Volume">
+            </div>
+            <div class="controls-main">
+              <button class="icon-btn lg" id="backBtn" type="button" aria-label="Back 10 seconds" title="Back 10s (←)"><svg class="icon"><use href="#i-back10"/></svg></button>
+              <button class="play-btn" id="playBtn" type="button" aria-label="Play" title="Play / pause (Space)" disabled><svg class="icon"><use href="#i-play"/></svg></button>
+              <button class="icon-btn lg" id="fwdBtn" type="button" aria-label="Forward 10 seconds" title="Forward 10s (→)"><svg class="icon"><use href="#i-fwd10"/></svg></button>
+              <button class="icon-btn lg" id="skipBtn" type="button" aria-label="Next song" title="Next song"><svg class="icon"><use href="#i-next"/></svg></button>
+            </div>
+            <div class="controls-side end">
+              <div class="react-wrap">
+                <button class="icon-btn" id="reactBtn" type="button" aria-label="Send a reaction" aria-haspopup="true" aria-expanded="false" aria-controls="reactMenu" title="React"><svg class="icon"><use href="#i-smile"/></svg></button>
+                <div class="react-menu" id="reactMenu" role="group" aria-label="Reactions"></div>
+              </div>
+              <button class="icon-btn" id="fullBtn" type="button" aria-label="Fullscreen" title="Fullscreen (F)"><svg class="icon"><use href="#i-full"/></svg></button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="deck">
@@ -142,29 +172,6 @@
           <div class="np-text">
             <h3 id="npTitle" class="np-title">Nothing playing</h3>
             <p id="npMeta" class="np-meta">Queue is empty</p>
-          </div>
-          <div class="reaction-bar" id="reactionBar" role="group" aria-label="Send a reaction"></div>
-        </div>
-
-        <div class="seek">
-          <span id="timeNow" class="time">0:00</span>
-          <input id="seekBar" class="range seek-range" type="range" min="0" max="100" step="1" value="0" aria-label="Seek" disabled>
-          <span id="timeTotal" class="time">0:00</span>
-        </div>
-
-        <div class="controls">
-          <div class="controls-side start">
-            <button class="icon-btn" id="muteBtn" type="button" aria-label="Mute" title="Mute (M)"><svg class="icon"><use href="#i-vol"/></svg></button>
-            <input id="volume" class="range volume" type="range" min="0" max="100" step="1" value="80" aria-label="Volume">
-          </div>
-          <div class="controls-main">
-            <button class="icon-btn lg" id="backBtn" type="button" aria-label="Back 10 seconds" title="Back 10s (←)"><svg class="icon"><use href="#i-back10"/></svg></button>
-            <button class="play-btn" id="playBtn" type="button" aria-label="Play" title="Play / pause (Space)" disabled><svg class="icon"><use href="#i-play"/></svg></button>
-            <button class="icon-btn lg" id="fwdBtn" type="button" aria-label="Forward 10 seconds" title="Forward 10s (→)"><svg class="icon"><use href="#i-fwd10"/></svg></button>
-            <button class="icon-btn lg" id="skipBtn" type="button" aria-label="Next song" title="Next song"><svg class="icon"><use href="#i-next"/></svg></button>
-          </div>
-          <div class="controls-side end">
-            <button class="icon-btn" id="fullBtn" type="button" aria-label="Fullscreen" title="Fullscreen (F)"><svg class="icon"><use href="#i-full"/></svg></button>
           </div>
         </div>
       </div>

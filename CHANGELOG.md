@@ -13,12 +13,15 @@ All notable changes to this project are documented here. The format follows [Kee
 - MIT license, contributing guide, security policy, CI (.NET + Node tests), documentation in `docs/`.
 
 ### Changed
+- YouTube-style player controls: they sit on top of the video, fade away while music plays and return on mouse move or tap (and always stay visible while paused). On a mouse, clicking the video plays or pauses; on touch a tap shows or hides the controls.
+- Reactions are tucked behind a single smiley icon that opens a small pop-up; your own emoji float instantly and the animation is smoother (eased rise with a gentle sway).
 - Complete UI redesign with a hand-written design system; Bootstrap, jQuery and Font Awesome removed.
 - Backend rewritten around a thread-safe, unit-tested `Room` with a server-owned playback clock; MVC removed in favour of static files + SignalR.
 - Any client can report a finished song (idempotent); the server advances overdue songs itself.
 - Video metadata resolves via search cache → YoutubeExplode → oEmbed.
 
 ### Fixed
+- Fullscreen on phones pinned the video to the bottom of the screen; the video frame itself now fills the screen (with a CSS fallback for iPhone Safari) and the orientation is locked to landscape where the browser allows it.
 - XSS: user-controlled text was inserted with `innerHTML`.
 - Spoofable identity: clients supplied their own names on every call.
 - Queue stalled when the admin left (only the admin's browser reported the end of a song).
