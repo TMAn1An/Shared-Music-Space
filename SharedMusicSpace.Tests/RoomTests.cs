@@ -201,6 +201,36 @@ public class RoomTests
     }
 
     [Fact]
+    public void A_song_of_unknown_length_learns_it_from_the_first_report_only()
+    {
+        Join("a", "Ann");
+        _room.AddSong(Song("v1", 0));                 // looked up without a duration
+        _room.AddSong(Song("v2", 0));                 // queued, also unknown
+        Assert.Equal(0, _room.Snapshot().Playback.Song!.Duration);
+
+        Assert.True(_room.SetDuration("v1", 212.6, "ignored: title is already real"));
+        Assert.Equal(212, _room.Snapshot().Playback.Song!.Duration);
+        Assert.Equal("Title v1", _room.Snapshot().Playback.Song!.Title);
+        Assert.False(_room.SetDuration("v1", 999, null));            // already known: first report wins
+
+        Assert.True(_room.SetDuration("v2", 100, null));             // works for queued songs too
+        Assert.Equal(100, _room.Snapshot().Queue[0].Duration);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5)]
+    [InlineData(99999)]
+    [InlineData(double.NaN)]
+    public void Nonsense_durations_are_rejected(double seconds)
+    {
+        Join("a", "Ann");
+        _room.AddSong(Song("v1", 0));
+        Assert.False(_room.SetDuration("v1", seconds, null));
+        Assert.False(_room.SetDuration("not-in-room", 100, null));
+    }
+
+    [Fact]
     public void Queue_empties_into_idle_state()
     {
         _room.AddSong(Song("v1"));

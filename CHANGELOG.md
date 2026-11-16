@@ -23,6 +23,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Video metadata resolves via search cache → YoutubeExplode → oEmbed.
 
 ### Fixed
+- Songs added from a pasted link had no length (and a disabled seek bar) when the server's YouTube lookup was rate-limited. In both modes the first player to load such a song now reports its real length and title to the room.
 - Fullscreen on phones pinned the video to the bottom of the screen; the video frame itself now fills the screen (with a CSS fallback for iPhone Safari) and the orientation is locked to landscape where the browser allows it.
 - XSS: user-controlled text was inserted with `innerHTML`.
 - Spoofable identity: clients supplied their own names on every call.

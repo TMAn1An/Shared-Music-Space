@@ -201,6 +201,37 @@ public sealed class Room
         }
     }
 
+    /// <summary>
+    /// Fills in a song's real length once. When the server can't look a video up (YouTube rate-limits server IPs),
+    /// the song is added with duration 0 and the first player that loads it reports the truth.
+    /// </summary>
+    public bool SetDuration(string videoId, double seconds, string? title)
+    {
+        lock (_gate)
+        {
+            if (!(seconds > 0 && seconds < 4 * 60 * 60)) return false;
+
+            Song Fill(Song s) => s with
+            {
+                Duration = (int)seconds,
+                Title = !string.IsNullOrWhiteSpace(title) && s.Title.StartsWith("YouTube video") ? title.Trim()[..Math.Min(title.Trim().Length, 200)] : s.Title,
+            };
+
+            if (_current is { Duration: 0 } cur && cur.Id == videoId)
+            {
+                _current = Fill(cur);
+            }
+            else
+            {
+                var idx = _queue.FindIndex(s => s.Id == videoId && s.Duration == 0);
+                if (idx < 0) return false;
+                _queue[idx] = Fill(_queue[idx]);
+            }
+            Touch();
+            return true;
+        }
+    }
+
     /// <summary>Skips to the next queued song (or stops when the queue is empty).</summary>
     public bool Skip()
     {

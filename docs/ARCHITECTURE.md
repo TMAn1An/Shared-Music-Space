@@ -34,7 +34,7 @@ The room — never a browser — is the single source of truth for what plays an
 
 **Who ends a song?** Every client reports `TrackEnded(videoId)` when its player finishes. The room accepts only the first report that matches the current song and a playhead near the end, so duplicates are harmless and no single browser is special. As a safety net, the room advances on its own 10 s after a song's duration passes (covers everyone's tab being asleep or autoplay-blocked). If a player cannot embed a video (YouTube error codes 2, 100, 101, 150), `Unplayable(videoId)` skips it for everyone.
 
-**Unknown durations.** Serverless mode may only know a title (via noembed.com), not a length. The first player that loads the video reports `SongMeta(videoId, duration, title)` and the room fills it in once.
+**Unknown durations (both modes).** A pasted link can arrive without a length: in serverless mode there is no server to ask, and in server mode YouTube may rate-limit the server's IP so only the title is available (via oEmbed). The first player that loads the video knows the truth and reports `SongMeta(videoId, duration, title)`; the room accepts the first sane report (0 < length < 4 h) for a song whose duration is still 0 and ignores later ones.
 
 ## Server mode
 
@@ -54,6 +54,7 @@ Identity always comes from the SignalR connection (`Context.ConnectionId`), neve
 | `TogglePlay()` · `Skip()` · `Seek(seconds)` | Playback control — open to everyone |
 | `SetRate(rate)` | Room-wide speed, `1` or `2` (hold-to-2×) |
 | `TrackEnded(videoId)` · `Unplayable(videoId)` | Reported by clients (idempotent) |
+| `SongMeta(videoId, duration, title)` | A player reports the real length of a song added without one (first report wins) |
 | `SendChat(text)` · `React(emoji)` | Chat (≤ 500 chars) and allow-listed reactions, limited to ≈ 5 reactions/s per connection |
 
 Server → client events: `state` (snapshot), `chat` (message), `reaction` (name, emoji).
