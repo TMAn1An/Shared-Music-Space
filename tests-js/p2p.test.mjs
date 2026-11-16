@@ -205,3 +205,26 @@ test('a reconnecting identity keeps its seat instead of becoming a duplicate mem
   await settle();
   assert.equal(snap(host).members.filter((m) => m.name.startsWith('Zed')).length, 1);
 });
+
+test('hold-to-2x from a guest speeds up the whole room and is released when that guest leaves', async () => {
+  const { host, guests } = await party(3);
+  await host.invoke('AddSong', VIDEO(1)); await settle();
+
+  await guests[0].invoke('SetRate', 2); await settle();
+  assert.equal(snap(host).playback.rate, 2);
+  assert.equal(snap(guests[1]).playback.rate, 2);
+
+  await guests[1].invoke('SetRate', 3); await settle();            // only 1x and 2x exist
+  assert.equal(snap(host).playback.rate, 2);
+
+  await guests[0].invoke('LeaveRoom'); await settle();             // the holder disappears
+  assert.equal(snap(host).playback.rate, 1);
+  assert.equal(snap(guests[1]).playback.rate, 1);
+});
+
+test('reactions are rate-limited per person so nobody can flood the screen', async () => {
+  const { host, guests } = await party(2);
+  for (let i = 0; i < 8; i++) await guests[0].invoke('React', '🔥');
+  await settle();
+  assert.ok(host.events.reaction.length >= 1 && host.events.reaction.length <= 2, `got ${host.events.reaction.length}`);
+});

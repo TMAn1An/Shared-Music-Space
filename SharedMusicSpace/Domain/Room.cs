@@ -23,6 +23,8 @@ public sealed class Room
 
     private Song? _current;
     private bool _playing;
+    private double _rate = 1;          // playback speed shared by the whole room (1 or 2)
+    private string? _rateByClientId;   // who set a non-1x speed, so it can be released if they vanish
     private double _baseSeconds;      // playhead at _baseAt (or frozen playhead when paused)
     private DateTimeOffset _baseAt;   // wall-clock moment _baseSeconds was valid
     private string _hostClientId = "";
@@ -81,6 +83,7 @@ public sealed class Room
 
             var member = _members[idx];
             _members.RemoveAt(idx);
+            if (_rate != 1 && member.ClientId == _rateByClientId) ResetRate();
             string? newHost = null;
             if (member.ClientId == _hostClientId && _members.Count > 0)
             {
@@ -210,6 +213,39 @@ public sealed class Room
     }
 
     /// <summary>
+    /// Fast-forward for everyone (hold-to-2x). Only 1x and 2x exist; the playhead is re-based so the
+    /// position never jumps when the speed changes.
+    /// </summary>
+    public bool SetRate(double rate, string byConnectionId)
+    {
+        lock (_gate)
+        {
+            if (_current == null || (rate != 1 && rate != 2) || rate == _rate) return false;
+            var member = _members.FirstOrDefault(m => m.ConnectionId == byConnectionId);
+            if (member == null) return false;
+            Rebase();
+            _rate = rate;
+            _rateByClientId = rate == 1 ? null : member.ClientId;
+            Touch();
+            return true;
+        }
+    }
+
+    private void Rebase()
+    {
+        var now = _clock.GetUtcNow();
+        _baseSeconds = PositionAt(now);
+        _baseAt = now;
+    }
+
+    private void ResetRate()
+    {
+        Rebase();
+        _rate = 1;
+        _rateByClientId = null;
+    }
+
+    /// <summary>
     /// A client reports the player reached the end. Idempotent: every client sends it,
     /// only the first one that matches the current song and playhead advances the room.
     /// </summary>
@@ -234,7 +270,7 @@ public sealed class Room
         lock (_gate)
         {
             if (_current == null || !_playing || _current.Duration <= 0) return false;
-            var raw = _baseSeconds + (_clock.GetUtcNow() - _baseAt).TotalSeconds;
+            var raw = _baseSeconds + (_clock.GetUtcNow() - _baseAt).TotalSeconds * _rate;
             if (raw < _current.Duration + graceSeconds) return false;
             Advance();
             return true;
@@ -271,6 +307,8 @@ public sealed class Room
         {
             _current = null;
             _playing = false;
+            _rate = 1;
+            _rateByClientId = null;
             _baseSeconds = 0;
         }
         Touch();
@@ -280,6 +318,8 @@ public sealed class Room
     {
         _current = song;
         _playing = true;
+        _rate = 1;                 // every new song starts at normal speed
+        _rateByClientId = null;
         _baseSeconds = 0;
         _baseAt = _clock.GetUtcNow();
     }
@@ -287,7 +327,7 @@ public sealed class Room
     private double PositionAt(DateTimeOffset now)
     {
         if (_current == null) return 0;
-        var pos = _playing ? _baseSeconds + (now - _baseAt).TotalSeconds : _baseSeconds;
+        var pos = _playing ? _baseSeconds + (now - _baseAt).TotalSeconds * _rate : _baseSeconds;
         pos = Math.Max(0, pos);
         return _current.Duration > 0 ? Math.Min(pos, _current.Duration) : pos;
     }
@@ -333,7 +373,7 @@ public sealed class Room
             var now = _clock.GetUtcNow();
             return new RoomSnapshot(
                 Code, Name, _rev, now.ToUnixTimeMilliseconds(),
-                new PlaybackDto(_current, _playing, Math.Round(PositionAt(now), 2)),
+                new PlaybackDto(_current, _playing, Math.Round(PositionAt(now), 2), _rate),
                 _members.Select(m => new MemberDto(m.Id, m.Name, m.ClientId == _hostClientId)).ToList(),
                 _queue.ToList(),
                 _history.ToList());

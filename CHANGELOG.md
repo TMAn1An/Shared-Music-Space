@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- Video gestures: tap to play/pause, press and hold for **2× for the whole room**, slide up while holding to lock 2×. The speed resets for each new song and when the person who set it leaves; anyone can press the "2×" badge to end it. New room setting `rate` (hub method `SetRate`, serverless command `rate`).
+- Reaction controls for your own screen: a switch to hide everyone's emoji, a per-person mute in the People tab, a cap on how many of a rapid burst are drawn, plus a per-sender rate limit on the server/host.
 - **Serverless (peer-to-peer) mode:** rooms run in the host's browser over WebRTC; works on any static host. Includes a hash-chained event log, ECDSA-signed commands with replay protection, automatic host failover and an optional personal YouTube API key for search.
 - Automatic mode selection (`/healthz` probe, `config.js`, `?p2p=local`).
 - Invite links (`/r/CODE`), pre-filled nickname, "Invite friends" flows, code-or-link join field, installable PWA manifest, screen wake lock.

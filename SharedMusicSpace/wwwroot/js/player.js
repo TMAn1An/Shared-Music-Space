@@ -65,7 +65,7 @@ export class SyncPlayer {
   expected() {
     const t = this.#target;
     if (!t) return 0;
-    return t.playing ? t.pos + (performance.now() - t.at) / 1000 : t.pos;
+    return t.playing ? t.pos + ((performance.now() - t.at) / 1000) * t.rate : t.pos;
   }
 
   /** Apply a server snapshot. `skewMs` = serverClock - localClock. */
@@ -80,10 +80,12 @@ export class SyncPlayer {
       return;
     }
     const age = Math.max(0, (Date.now() + skewMs - serverTime) / 1000);
+    const rate = playback.rate ?? 1;
     this.#target = {
       id: song.id,
       playing: playback.playing,
-      pos: playback.position + (playback.playing ? age : 0),
+      rate,
+      pos: playback.position + (playback.playing ? age * rate : 0),
       at: performance.now(),
     };
     this.reconcile(true);
@@ -104,6 +106,7 @@ export class SyncPlayer {
     }
 
     const state = p.getPlayerState();
+    this.#syncRate(t.rate);
     const settled = performance.now() - this.#loadedAt > SETTLE_MS;
 
     if (t.playing) {
@@ -141,7 +144,13 @@ export class SyncPlayer {
     this.#muted ? this.#player.mute() : this.#player.unMute();
   }
 
+  /** The room can fast-forward (hold-to-2x); keep the iframe's speed identical to the room's. */
+  #syncRate(rate) {
+    try { if (Math.abs((this.#player.getPlaybackRate?.() ?? 1) - rate) > 0.01) this.#player.setPlaybackRate(rate); } catch { /* not ready yet */ }
+  }
+
   #onState(state) {
+    if (state === S.PLAYING && this.#target) this.#syncRate(this.#target.rate);
     if (state === S.PLAYING) { clearTimeout(this.#blockedTimer); this.#hooks.onBlocked?.(false); }
     if (state === S.ENDED && this.#loadedId) this.#hooks.onEnded?.(this.#loadedId);
   }

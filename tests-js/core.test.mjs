@@ -104,3 +104,35 @@ test('parseVideoId handles the usual link shapes', () => {
   }
   for (const bad of ['', 'hello world', 'https://example.com/watch?v=dQw4w9WgXcQ', 'https://youtu.be/short']) assert.equal(parseVideoId(bad), null, bad);
 });
+
+test('RoomCore speed: 2x moves the playhead twice as fast without jumping, resets per song and when its owner leaves', () => {
+  const c = clock();
+  const r = new RoomCore({ code: 'ABC123', name: 'T', now: c.now });
+  r.join({ id: 'a', key: 'ka', peerId: 'pa', name: 'Ann' });
+  r.join({ id: 'b', key: 'kb', peerId: 'pb', name: 'Bob' });
+  r.addSong(song('v1', 1000)); r.addSong(song('v2', 1000));
+
+  c.advance(10);
+  assert.ok(r.setRate(2, 'b'));
+  assert.equal(r.snapshot().playback.position, 10);             // no jump
+  assert.equal(r.snapshot().playback.rate, 2);
+  c.advance(10);
+  assert.equal(r.snapshot().playback.position, 30);             // 10 s real time = 20 s of music
+
+  for (const bad of [0.5, 1.5, 3, NaN]) assert.equal(r.setRate(bad, 'a'), false, `rate ${bad}`);
+  assert.equal(r.setRate(2, 'stranger'), false);
+
+  r.skip();                                                      // next song starts at normal speed
+  assert.equal(r.snapshot().playback.rate, 1);
+
+  r.setRate(2, 'b');
+  r.leave('b');                                                  // the holder vanished → speed released
+  assert.equal(r.snapshot().playback.rate, 1);
+
+  // survives export/import (host failover keeps the speed)
+  r.setRate(2, 'a');
+  const replica = RoomCore.fromState(JSON.parse(JSON.stringify(r.exportState())), { now: c.now });
+  assert.equal(replica.snapshot().playback.rate, 2);
+  c.advance(5);
+  assert.equal(Math.round(replica.snapshot().playback.position - r.snapshot().playback.position), 0);
+});

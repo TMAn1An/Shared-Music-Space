@@ -200,7 +200,7 @@ body.p2p .p2p-note { display: block; }
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--border);
 }
 .yt-host, .yt-host iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-.video-shield { position: absolute; inset: 0; z-index: 2; cursor: pointer; }  /* blocks clicks on the embedded YouTube UI */
+.video-shield { position: absolute; inset: 0; z-index: 2; cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }  /* blocks clicks on the embedded YouTube UI */
 .empty-stage, .tap-play { position: absolute; inset: 0; z-index: 3; display: grid; place-content: center; justify-items: center; gap: .6rem; text-align: center; padding: 1.5rem; }
 .empty-stage { background: radial-gradient(80% 80% at 50% 0%, rgb(139 92 246 / .22), transparent 70%), #0d0d16; }
 .empty-stage h3 { font-size: 1.2rem; letter-spacing: -.01em; }
@@ -244,6 +244,19 @@ body.p2p .p2p-note { display: block; }
 .react-btn:hover { background: var(--surface-2); transform: translateY(-3px) scale(1.18); }
 .react-btn:active { transform: scale(.86); }
 @keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.6); } }
+
+.rate-pill { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 7; display: inline-flex; align-items: center; gap: .45rem;
+  padding: .42rem .9rem; border-radius: 999px; background: rgb(0 0 0 / .62); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgb(255 255 255 / .2); color: #fff; font-size: .82rem; font-weight: 700; white-space: nowrap; cursor: pointer; animation: pill-in .24s var(--ease); }
+.rate-pill .icon { width: 1.05em; height: 1.05em; }
+.rate-pill.locked { background: rgb(139 92 246 / .8); border-color: rgb(255 255 255 / .35); }
+@keyframes pill-in { from { opacity: 0; transform: translate(-50%, -8px) scale(.92); } }
+.react-sep { width: 1px; align-self: stretch; margin: 6px 4px; background: var(--border-strong); }
+.react-btn.toggle { display: inline-grid; place-items: center; color: var(--muted); }
+.react-btn.toggle .icon { width: 1.2rem; height: 1.2rem; }
+.react-btn.toggle[aria-pressed="true"] { color: #fff; background: rgb(139 92 246 / .4); }
+.person .icon-btn[aria-pressed="true"] { color: var(--danger); background: rgb(251 113 133 / .12); }
+.person-end { margin-left: auto; display: flex; flex: none; }
 
 /* ---------- controls overlay (YouTube-style) ---------- */
 .overlay { position: absolute; left: 0; right: 0; bottom: 0; z-index: 6; padding: 36px 16px 8px; display: flex; flex-direction: column; gap: 2px;

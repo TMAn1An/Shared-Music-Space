@@ -32,7 +32,7 @@ Create a room, share the link, queue songs, chat and react together — no sign-
 - **Easy to start.** A fun nickname is pre-filled, join with a code *or a pasted invite link* (`/r/ABC123`), one-tap "Invite friends", and a reload or network drop puts you back in your seat.
 - **Queue like a party.** Search YouTube or paste a link; add, "play next", remove, and see what played recently. Unplayable videos are skipped automatically.
 - **Social.** Live chat with history, floating emoji reactions, a host crown that moves on when the host leaves.
-- **Feels like YouTube.** Controls sit on the video and fade away while it plays; tap or move the mouse to bring them back. Reactions hide behind one smiley button and float up smoothly.
+- **Feels like YouTube.** Controls sit on the video and fade away while it plays; tap to play/pause, **press and hold for 2× (for the whole room)**, slide up to lock it. Reactions hide behind one smiley button, float up smoothly, and you can hide or mute them on your own screen.
 - **Feels native.** Responsive split view on desktop, thumb-friendly tabs on phones, keyboard shortcuts (`Space` play/pause · `←/→` ±10 s · `M` mute · `F` fullscreen), media-key and lock-screen controls, installable as an app, screen stays awake while playing.
 - **Accessible.** Keyboard focus styles, labelled controls, reduced-motion support.
 - **Safe by design.** All user text is rendered with DOM APIs (no `innerHTML`), identity comes from the connection or a signed key, never from a client-supplied name.

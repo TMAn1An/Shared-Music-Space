@@ -40,6 +40,7 @@ export class P2PBackend {
   #timers = [];
   #nonce = 0;
   #seen = new Map();            // memberId -> highest command nonce accepted (replay protection)
+  #lastReact = new Map();       // memberId -> time of last accepted reaction
   #pending = new Map();         // rid -> resolve (peer waiting for host's answer)
   #awaiting = false;            // we elected a new host locally and wait for its first state
   #skew = 0;                    // hostClock - localClock
@@ -82,6 +83,7 @@ export class P2PBackend {
       case 'PlayNext': return this.#command({ type: 'next', q: a[0] });
       case 'SendChat': return this.#command({ type: 'chat', text: a[0] });
       case 'React': return this.#command({ type: 'react', emoji: a[0] });
+      case 'SetRate': return this.#command({ type: 'rate', r: Number(a[0]) });
       case 'SongMeta': return this.#command({ type: 'meta', v: a[0], d: a[1], title: a[2] });
       default: throw new Error(`Unknown method ${method}`);
     }
@@ -290,6 +292,7 @@ export class P2PBackend {
     switch (c.type) {
       case 'toggle': changed = r.togglePlay(); break;
       case 'seek': changed = r.seek(c.s); break;
+      case 'rate': changed = r.setRate(c.r, memberId); break;
       case 'ended': changed = r.trackEnded(String(c.v)); break;
       case 'remove': changed = r.removeSong(String(c.q), memberId); break;
       case 'next': changed = r.moveToFront(String(c.q)); break;
@@ -322,9 +325,13 @@ export class P2PBackend {
         if (text) this.#pushChat({ id: randomId(10), kind: 'user', name: who.name, text, time: this.now() });
         return undefined;
       }
-      case 'react':
+      case 'react': {
+        const t = this.now();
+        if (t - (this.#lastReact.get(memberId) ?? 0) < 200) return undefined; // ≈5 per second per person, no flooding
+        this.#lastReact.set(memberId, t);
         if (REACTIONS.has(c.emoji)) { this.#t.send('reaction', { name: who.name, emoji: c.emoji }); this.#emit('reaction', who.name, c.emoji); }
         return undefined;
+      }
       default: return undefined;
     }
     if (changed) await this.#commit(`${c.type}:${memberId}`);

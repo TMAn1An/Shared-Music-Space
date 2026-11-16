@@ -11,7 +11,7 @@ public sealed record ChatMessage(string Id, string Kind, string Name, string Tex
 
 public sealed record MemberDto(string Id, string Name, bool IsHost);
 
-public sealed record PlaybackDto(Song? Song, bool Playing, double Position);
+public sealed record PlaybackDto(Song? Song, bool Playing, double Position, double Rate = 1);
 
 public sealed record RoomSnapshot(
     string Code,

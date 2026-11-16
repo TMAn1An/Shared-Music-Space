@@ -136,6 +136,71 @@ public class RoomTests
     }
 
     [Fact]
+    public void Two_x_speed_moves_the_playhead_twice_as_fast_without_jumping()
+    {
+        Join("a", "Ann");
+        _room.AddSong(Song("v1", 1000));
+        _clock.Advance(10);
+        Assert.True(_room.SetRate(2, "conn-a"));
+        Assert.Equal(10, _room.Snapshot().Playback.Position, 1);   // no jump when the speed changes
+        Assert.Equal(2, _room.Snapshot().Playback.Rate);
+        _clock.Advance(10);
+        Assert.Equal(30, _room.Snapshot().Playback.Position, 1);   // 10 s of real time = 20 s of music
+
+        Assert.True(_room.SetRate(1, "conn-a"));
+        _clock.Advance(5);
+        Assert.Equal(35, _room.Snapshot().Playback.Position, 1);
+    }
+
+    [Theory]
+    [InlineData(0.5)]
+    [InlineData(3)]
+    [InlineData(1.5)]
+    public void Only_1x_and_2x_are_accepted(double rate)
+    {
+        Join("a", "Ann");
+        _room.AddSong(Song("v1"));
+        Assert.False(_room.SetRate(rate, "conn-a"));
+        Assert.Equal(1, _room.Snapshot().Playback.Rate);
+    }
+
+    [Fact]
+    public void Speed_resets_for_the_next_song_and_when_its_owner_leaves()
+    {
+        Join("a", "Ann"); Join("b", "Bob");
+        _room.AddSong(Song("v1")); _room.AddSong(Song("v2"));
+
+        _room.SetRate(2, "conn-b");
+        _room.Skip();
+        Assert.Equal(1, _room.Snapshot().Playback.Rate);            // new song, normal speed
+
+        _room.SetRate(2, "conn-b");
+        _room.Leave("conn-b");                                       // the person holding 2x vanished
+        Assert.Equal(1, _room.Snapshot().Playback.Rate);
+    }
+
+    [Fact]
+    public void Speed_needs_a_song_and_a_member()
+    {
+        Join("a", "Ann");
+        Assert.False(_room.SetRate(2, "conn-a"));                    // nothing playing
+        _room.AddSong(Song("v1"));
+        Assert.False(_room.SetRate(2, "conn-stranger"));
+    }
+
+    [Fact]
+    public void Overdue_check_respects_the_speed()
+    {
+        Join("a", "Ann");
+        _room.AddSong(Song("v1", 100)); _room.AddSong(Song("v2", 100));
+        _room.SetRate(2, "conn-a");
+        _clock.Advance(54);                                          // 108 s of music: past the end, inside the 10 s grace
+        Assert.False(_room.AdvanceIfOverdue(10));
+        _clock.Advance(6);                                           // 120 s > 100 + 10 grace
+        Assert.True(_room.AdvanceIfOverdue(10));
+    }
+
+    [Fact]
     public void Queue_empties_into_idle_state()
     {
         _room.AddSong(Song("v1"));

@@ -31,11 +31,15 @@ const state = {
   added: new Set(),
   scrubbing: false,
   busy: false,
+  holding: false,      // finger/mouse is down on the video (hold-to-2x)
+  rateLocked: false,   // we locked 2x (slide up while holding)
+  hideReactions: store.get('ms.hideReactions') === '1',
+  mutedFrom: new Set((() => { try { return JSON.parse(session.get('ms.mutedFrom') ?? '[]'); } catch { return []; } })()),
 };
 
 const el = {
   lobby: $('#lobby'), room: $('#room'), stage: $('#stage'), frame: $('#videoFrame'), overlay: $('#overlay'),
-  reactBtn: $('#reactBtn'), reactMenu: $('#reactMenu'),
+  reactBtn: $('#reactBtn'), reactMenu: $('#reactMenu'), ratePill: $('#ratePill'),
   form: $('#lobbyForm'), name: $('#nameInput'), code: $('#codeInput'),
   createBtn: $('#createBtn'), joinBtn: $('#joinBtn'), error: $('#lobbyError'),
   connStatus: $('#connStatus'), connText: $('#connText'), inviteNote: $('#inviteNote'),
@@ -273,7 +277,19 @@ conn.on('chat', (msg) => {
   }
 });
 
-conn.on('reaction', (name, emoji) => { if (name !== state.me?.name) floatReaction(emoji, name); }); // our own float instantly on tap
+const recentReacts = new Map();
+const reactionFlood = (name) => {          // one person spamming? show only the first few of a burst
+  const now = Date.now();
+  const times = (recentReacts.get(name) ?? []).filter((t) => now - t < 5000);
+  times.push(now);
+  recentReacts.set(name, times);
+  return times.length > 6;
+};
+conn.on('reaction', (name, emoji) => {
+  if (name === state.me?.name) return;                         // our own already floated instantly on tap
+  if (state.hideReactions || state.mutedFrom.has(name) || reactionFlood(name)) return;
+  floatReaction(emoji, name);
+});
 
 /* ==========================================================================
    Rendering
@@ -320,6 +336,7 @@ function renderNowPlaying() {
   if (!hasSong) { el.seek.value = 0; paintRange(el.seek); el.timeNow.textContent = '0:00'; }
   el.frame.classList.toggle('no-song', !hasSong);
   syncOverlay(playing);
+  renderRatePill();
 
   if (s) el.ambient.style.setProperty('--art', `url(${thumbUrl(s.id)})`);
   el.ambient.classList.toggle('has-art', hasSong);
@@ -401,7 +418,21 @@ function renderPeople() {
       h('div', { class: 'person-name' },
         h('span', { text: m.name }),
         m.id === state.me?.id ? h('span', { class: 'tag', text: 'You' }) : null,
-        m.isHost ? h('span', { class: 'tag host' }, icon('crown'), 'Host') : null)));
+        m.isHost ? h('span', { class: 'tag host' }, icon('crown'), 'Host') : null),
+      m.id === state.me?.id ? null : h('div', { class: 'person-end' }, (() => {
+        const muted = state.mutedFrom.has(m.name);
+        return h('button', {
+          class: 'icon-btn sm', type: 'button', 'aria-pressed': String(muted),
+          title: muted ? `Show reactions from ${m.name}` : `Hide reactions from ${m.name}`,
+          'aria-label': muted ? `Show reactions from ${m.name}` : `Hide reactions from ${m.name}`,
+          onclick: () => {
+            muted ? state.mutedFrom.delete(m.name) : state.mutedFrom.add(m.name);
+            session.set('ms.mutedFrom', JSON.stringify([...state.mutedFrom]));
+            toast(muted ? `Showing reactions from ${m.name}` : `Hiding reactions from ${m.name}`);
+            renderPeople();
+          },
+        }, icon(muted ? 'eye-off' : 'eye'));
+      })())));
   }
   el.peopleView.replaceChildren(...nodes);
 }
@@ -516,6 +547,24 @@ REACTIONS.forEach((emoji, i) => {
   }, emoji));
 });
 
+// One switch to silence everyone's floating emoji on *this* screen (yours always show).
+el.reactMenu.append(h('span', { class: 'react-sep', 'aria-hidden': 'true' }), (() => {
+  const btn = h('button', { class: 'react-btn toggle', type: 'button', id: 'hideReactBtn', style: `--i:${REACTIONS.length}`, onclick: () => setHideReactions(!state.hideReactions) }, icon('eye-off'));
+  return btn;
+})());
+function setHideReactions(hide, { silent = false } = {}) {
+  state.hideReactions = hide;
+  store.set('ms.hideReactions', hide ? '1' : '0');
+  const btn = $('#hideReactBtn');
+  btn.setAttribute('aria-pressed', String(hide));
+  const label = hide ? 'Show reactions from others' : 'Hide reactions from others';
+  btn.title = label; btn.setAttribute('aria-label', label);
+  setIcon(el.reactBtn, hide ? 'smile-off' : 'smile');
+  if (hide) el.reactionsLayer.replaceChildren();
+  if (!silent) toast(hide ? 'Reactions from others are hidden on your screen' : 'Reactions from others are visible again');
+}
+setHideReactions(state.hideReactions, { silent: true });
+
 let menuTimer;
 const menuOpen = () => el.reactMenu.classList.contains('open');
 function setMenu(open) {
@@ -604,7 +653,6 @@ setInterval(() => {
 
 /* ---------- YouTube-style overlay: visible when paused or touched, fades while music plays ---------- */
 const frame = el.frame;
-const coarse = matchMedia('(pointer: coarse)');
 let overlayTimer = 0;
 
 const overlayMustStay = () => !song() || !playback()?.playing || menuOpen() || !!frame.querySelector(':focus-visible');
@@ -624,13 +672,74 @@ frame.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') sh
 frame.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') { clearTimeout(overlayTimer); overlayTimer = setTimeout(hideOverlayNow, 700); } });
 el.overlay.addEventListener('pointerdown', showOverlay);
 el.overlay.addEventListener('input', showOverlay);
-$('.video-shield').addEventListener('click', () => {
-  if (!song()) return;
-  if (coarse.matches) {
-    // Touch, like YouTube mobile: a tap reveals the controls, another tap hides them.
-    if (frame.classList.contains('idle') || !playback().playing) showOverlay(); else hideOverlayNow();
-  } else { call('TogglePlay'); showOverlay(); } // mouse: click the video to play/pause
+/* ---------- gestures on the video ----------
+   tap            → play / pause
+   press and hold → 2× for the whole room while held (everyone fast-forwards together)
+   …and slide up  → lock 2× (tap again, or press the badge, to go back to 1×) */
+const shield = $('.video-shield');
+const HOLD_MS = 380, LOCK_PX = 56, MOVE_TOLERANCE = 12;
+let press = null;
+
+const setRate = (r) => call('SetRate', r).catch(() => {});
+
+function renderRatePill() {
+  const rate = playback()?.rate ?? 1;
+  const active = !!song() && (rate > 1 || state.holding);
+  if (!active) { state.rateLocked = false; el.ratePill.hidden = true; return; }
+  const locked = state.rateLocked || (press?.locked ?? false);
+  let label;
+  if (state.holding) label = press?.locked ? '2× locked' : '2× · slide up to lock';
+  else if (state.rateLocked) label = '2× locked · tap to resume';
+  else label = '2× speed · tap for normal';           // somebody else is holding / locked it
+  el.ratePill.classList.toggle('locked', locked);
+  el.ratePill.replaceChildren(icon(locked ? 'lock' : 'ff'), label);
+  el.ratePill.hidden = false;
+}
+
+function releaseSpeed() {
+  state.holding = false; state.rateLocked = false; press = null;
+  el.ratePill.hidden = true;
+  setRate(1);
+}
+
+shield.addEventListener('contextmenu', (e) => e.preventDefault());
+shield.addEventListener('pointerdown', (e) => {
+  if (!song() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (state.rateLocked) { releaseSpeed(); return; }                                  // a tap ends our own lock
+  shield.setPointerCapture?.(e.pointerId);
+  const p = press = { id: e.pointerId, x: e.clientX, y: e.clientY, held: false, locked: false, moved: false, timer: 0 };
+  p.timer = setTimeout(() => {
+    if (press !== p) return;
+    p.held = true; state.holding = true;
+    navigator.vibrate?.(12);
+    setRate(2); renderRatePill(); hideOverlayNow();                  // controls get out of the way, like YouTube
+  }, HOLD_MS);
 });
+shield.addEventListener('pointermove', (e) => {
+  if (!press || e.pointerId !== press.id) return;
+  const dx = e.clientX - press.x, dy = e.clientY - press.y;
+  if (!press.held) { if (Math.hypot(dx, dy) > MOVE_TOLERANCE) { clearTimeout(press.timer); press.moved = true; } return; }
+  if (!press.locked && dy < -LOCK_PX) { press.locked = true; navigator.vibrate?.(20); renderRatePill(); }
+});
+function endPress(e, cancelled) {
+  if (!press || e.pointerId !== press.id) return;
+  const p = press; clearTimeout(p.timer);
+  if (p.held) {
+    state.holding = false;
+    if (p.locked && !cancelled) { state.rateLocked = true; press = null; renderRatePill(); }
+    else releaseSpeed();
+  } else {
+    press = null;
+    if (!p.moved && !cancelled) { call('TogglePlay'); showOverlay(); }       // a plain tap
+  }
+}
+shield.addEventListener('pointerup', (e) => endPress(e, false));
+shield.addEventListener('pointercancel', (e) => endPress(e, true));
+el.ratePill.addEventListener('click', releaseSpeed);
+// Never leave the room stuck at 2× because a finger went away.
+addEventListener('blur', () => { if (press?.held && !press.locked) releaseSpeed(); });
+addEventListener('pagehide', () => { if (state.holding || state.rateLocked) releaseSpeed(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && press?.held && !press.locked) releaseSpeed(); });
 
 /* ---------- fullscreen: the video frame itself fills the screen (with a CSS fallback for iPhone) ---------- */
 const fullBtn = $('#fullBtn');

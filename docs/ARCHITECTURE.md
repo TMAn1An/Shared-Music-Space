@@ -24,11 +24,13 @@ The two implementations share the same room rules (`Domain/Room.cs` and `js/core
 
 The room — never a browser — is the single source of truth for what plays and where the playhead is.
 
-1. The room stores `{ song, playing, baseSeconds, baseAt }`. The playhead is `baseSeconds + (now − baseAt)` while playing, or `baseSeconds` while paused. Play, pause, seek, skip and song changes just rewrite those fields.
-2. After every change the room sends a **snapshot**: `{ code, name, rev, serverTime, playback: { song, playing, position }, members, queue, history }`.
+1. The room stores `{ song, playing, rate, baseSeconds, baseAt }`. The playhead is `baseSeconds + (now − baseAt) × rate` while playing, or `baseSeconds` while paused. Play, pause, seek, skip, speed and song changes just rewrite those fields (a speed change re-bases the playhead so it never jumps).
+2. After every change the room sends a **snapshot**: `{ code, name, rev, serverTime, playback: { song, playing, position, rate }, members, queue, history }`.
 3. A client computes how long ago the snapshot was made (`now + skew − serverTime`, where `skew` is the measured clock offset to the room's clock) and extrapolates the expected position locally.
 4. `js/player.js` drives the YouTube iframe towards that position: it loads the video at the right second, plays or pauses to match, and **re-seeks if the player drifts more than ~1.5 s** (checked every 2 s, ignored for 3 s after a load while buffering).
 5. Late joiners and reconnects receive a snapshot on join and land on the exact second.
+
+**Hold-to-2× is a room setting.** Pressing and holding the video sets `rate = 2` for *everyone*, so the room keeps listening to the same thing (a private 2× would put you out of sync and the drift correction would pull you back). Only `1` and `2` are accepted; the rate resets to `1` for every new song, and when the member who set it leaves or disconnects, so it can never get stuck. Releasing, tapping while locked, or pressing the on-screen "2×" badge (any member can) sets it back to `1`. The player mirrors the room's rate through the IFrame API's `setPlaybackRate`.
 
 **Who ends a song?** Every client reports `TrackEnded(videoId)` when its player finishes. The room accepts only the first report that matches the current song and a playhead near the end, so duplicates are harmless and no single browser is special. As a safety net, the room advances on its own 10 s after a song's duration passes (covers everyone's tab being asleep or autoplay-blocked). If a player cannot embed a video (YouTube error codes 2, 100, 101, 150), `Unplayable(videoId)` skips it for everyone.
 
@@ -50,8 +52,9 @@ Identity always comes from the SignalR connection (`Context.ConnectionId`), neve
 | `RemoveSong(queueId)` | Allowed for the song's adder or the host |
 | `PlayNext(queueId)` | Move a queued song to the front |
 | `TogglePlay()` · `Skip()` · `Seek(seconds)` | Playback control — open to everyone |
+| `SetRate(rate)` | Room-wide speed, `1` or `2` (hold-to-2×) |
 | `TrackEnded(videoId)` · `Unplayable(videoId)` | Reported by clients (idempotent) |
-| `SendChat(text)` · `React(emoji)` | Chat (≤ 500 chars) and allow-listed reactions |
+| `SendChat(text)` · `React(emoji)` | Chat (≤ 500 chars) and allow-listed reactions, limited to ≈ 5 reactions/s per connection |
 
 Server → client events: `state` (snapshot), `chat` (message), `reaction` (name, emoji).
 
@@ -96,6 +99,8 @@ Server → client events: `state` (snapshot), `chat` (message), `reaction` (name
 | `ping` / `pong` | peer ↔ host | clock-skew measurement |
 | `bye` | peer → host | polite leave |
 
+Commands (`cmd.c.type`): `toggle`, `skip`, `seek`, `rate`, `ended`, `unplayable`, `remove`, `next`, `addSong`, `chat`, `react`, `meta`.
+
 Peers ignore `state`, `chat`, `reaction`, `res` and `pong` unless they come from the peer that the state itself names as host.
 
 ### Identity and signatures
@@ -123,6 +128,19 @@ The room therefore survives as long as at least one member stays. Playback posit
 ### Limits
 
 Room size ≤ 12 (full-mesh WebRTC), queue ≤ 100, history 30, chat 150 messages kept, names 24 characters, chat messages 500 characters.
+
+## Gestures and reactions (frontend)
+
+| Gesture on the video | Result |
+|---|---|
+| Tap / click | Play or pause for everyone |
+| Press and hold (≈ 0.4 s) | 2× for the whole room while held |
+| …then slide up | Locks 2×; the next tap (or the badge) returns to 1× |
+| Mouse move / touch | Brings the YouTube-style controls back; they fade after 3 s while playing |
+
+`touch-action: none` on the video shield keeps the page from scrolling during a hold, and every way a hold can end without a release event (`pointercancel`, blur, tab hidden, page hide) sets the speed back to 1×.
+
+Reactions never have to be annoying: one switch hides everyone's floating emoji on *your* screen only (your own still float), each person in the People tab can be muted individually, only the first few reactions of a rapid burst from one person are drawn, and the server (or the host, in serverless mode) rate-limits each sender. These preferences are local to your browser.
 
 ## Frontend structure
 

@@ -39,6 +39,14 @@ Symptom: *"We couldn't reach that room. The host may be offline, or your network
 
 The player re-aligns itself whenever it drifts more than ~1.5 s. If one person is consistently behind, their connection is probably buffering. Pausing and resuming from any device re-syncs everyone.
 
+## The music is playing at 2× and I didn't ask for it
+
+Somebody is holding the video (or locked 2× by sliding up). It is a room-wide setting. Tap the purple/dark **"2×"** badge at the top of the video, or tap the video if you locked it yourself, to go back to normal. The speed also resets by itself when the song changes or the person who set it leaves.
+
+## Someone keeps spamming reactions
+
+Open the smiley menu on the video and press the eye icon to hide everyone's reactions on your screen, or open **People** and press the eye next to that person to mute only them. Both only affect your own screen.
+
 ## Search doesn't work
 
 - **Server mode:** YouTube may be rate-limiting the server's IP (`RequestLimitExceededException` in the server log). Titles still load through oEmbed, and pasting links always works; the limit usually clears after a few hours. Consider running from a different IP.

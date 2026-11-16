@@ -53,9 +53,11 @@ window.MUSIC_SPACE_P2P = {
 |---|---|---|
 | `ms.name` | localStorage | Last nickname |
 | `ms.volume`, `ms.muted` | localStorage | Player volume (0–100) and mute |
+| `ms.hideReactions` | localStorage | `1` when floating emoji from others are hidden on this device |
 | `ms.ytkey` | localStorage | Optional personal YouTube Data API key (serverless search). Never leaves your browser except in requests to Google. |
 | `ms.cid` | sessionStorage | Per-tab client id (server mode seat restore) |
 | `ms.session` | sessionStorage | Current room code + name, to rejoin after a reload |
+| `ms.mutedFrom` | sessionStorage | Names whose reactions you muted in the People tab |
 | `ms.identity` | sessionStorage | Per-tab signing key pair (serverless mode) |
 
 ## Built-in limits
@@ -71,7 +73,7 @@ window.MUSIC_SPACE_P2P = {
 | Max video length | 4 h | 4 h |
 | Empty-room lifetime | 10 min | — (room ends when everyone leaves) |
 
-Reactions are limited to ❤️ 🔥 😂 👏 🎉 😮.
+Reactions are limited to ❤️ 🔥 😂 👏 🎉 😮, and to about five per second per person. Playback speed is limited to 1× and 2×.
 
 ## Serverless search
 

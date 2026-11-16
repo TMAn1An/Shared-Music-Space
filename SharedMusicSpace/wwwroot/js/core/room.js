@@ -15,6 +15,8 @@ export class RoomCore {
     this.history = [];
     this.current = null;
     this.playing = false;
+    this.rate = 1;           // playback speed shared by the whole room (1 or 2)
+    this.rateBy = null;      // member who set a non-1x speed, so it is released if they vanish
     this.baseSeconds = 0;    // playhead at baseAt
     this.baseAt = 0;         // local-clock ms when baseSeconds was valid
     this.hostId = '';
@@ -41,6 +43,7 @@ export class RoomCore {
     const idx = this.members.findIndex((m) => m.id === memberId);
     if (idx < 0) return { member: null, newHost: null };
     const [member] = this.members.splice(idx, 1);
+    if (this.rate !== 1 && member.id === this.rateBy) this.#resetRate();
     let newHost = null;
     if (member.id === this.hostId && this.members.length > 0) {
       this.hostId = this.members[0].id;
@@ -108,6 +111,19 @@ export class RoomCore {
     return true;
   }
 
+  /** Fast-forward for everyone (hold-to-2x). Only 1x and 2x exist; the playhead is re-based so it never jumps. */
+  setRate(rate, memberId) {
+    if (!this.current || (rate !== 1 && rate !== 2) || rate === this.rate || !this.byId(memberId)) return false;
+    this.#rebase();
+    this.rate = rate;
+    this.rateBy = rate === 1 ? null : memberId;
+    this.#touch();
+    return true;
+  }
+
+  #rebase() { const t = this.now(); this.baseSeconds = this.#position(t); this.baseAt = t; }
+  #resetRate() { this.#rebase(); this.rate = 1; this.rateBy = null; }
+
   skip() {
     if (!this.current) return false;
     this.#advance();
@@ -131,7 +147,7 @@ export class RoomCore {
 
   advanceIfOverdue(graceSeconds) {
     if (!this.current || !this.playing || this.current.duration <= 0) return false;
-    const raw = this.baseSeconds + (this.now() - this.baseAt) / 1000;
+    const raw = this.baseSeconds + ((this.now() - this.baseAt) / 1000) * this.rate;
     if (raw < this.current.duration + graceSeconds) return false;
     this.#advance();
     return true;
@@ -154,20 +170,22 @@ export class RoomCore {
     }
     const next = this.queue.shift();
     if (next) this.#start(next);
-    else { this.current = null; this.playing = false; this.baseSeconds = 0; }
+    else { this.current = null; this.playing = false; this.rate = 1; this.rateBy = null; this.baseSeconds = 0; }
     this.#touch();
   }
 
   #start(song) {
     this.current = song;
     this.playing = true;
+    this.rate = 1;           // every new song starts at normal speed
+    this.rateBy = null;
     this.baseSeconds = 0;
     this.baseAt = this.now();
   }
 
   #position(t) {
     if (!this.current) return 0;
-    let pos = this.playing ? this.baseSeconds + (t - this.baseAt) / 1000 : this.baseSeconds;
+    let pos = this.playing ? this.baseSeconds + ((t - this.baseAt) / 1000) * this.rate : this.baseSeconds;
     pos = Math.max(0, pos);
     return this.current.duration > 0 ? Math.min(pos, this.current.duration) : pos;
   }
@@ -181,7 +199,7 @@ export class RoomCore {
     const t = this.now();
     return {
       code: this.code, name: this.name, rev: this.rev, serverTime: t,
-      playback: { song: this.current, playing: this.playing, position: Math.round(this.#position(t) * 100) / 100 },
+      playback: { song: this.current, playing: this.playing, position: Math.round(this.#position(t) * 100) / 100, rate: this.rate },
       members: this.members.map((m) => ({ id: m.id, name: m.name, isHost: m.id === this.hostId })),
       queue: [...this.queue],
       history: [...this.history],
@@ -194,7 +212,7 @@ export class RoomCore {
     return {
       code: this.code, name: this.name, rev: this.rev, epoch: this.epoch, hostId: this.hostId, joinCounter: this.joinCounter,
       members: this.members.map((m) => ({ ...m })),
-      queue: this.queue, history: this.history, current: this.current, playing: this.playing,
+      queue: this.queue, history: this.history, current: this.current, playing: this.playing, rate: this.rate, rateBy: this.rateBy,
       position: this.#position(t), hostTime: t,
     };
   }
@@ -207,6 +225,8 @@ export class RoomCore {
     room.history = state.history.map((s) => ({ ...s }));
     room.current = state.current ? { ...state.current } : null;
     room.playing = state.playing;
+    room.rate = state.rate ?? 1;
+    room.rateBy = state.rateBy ?? null;
     room.baseSeconds = state.position;
     room.baseAt = state.hostTime - skewMs;
     room.hostId = state.hostId;
