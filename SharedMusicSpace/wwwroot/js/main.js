@@ -1,5 +1,6 @@
 import { $, h, icon, setIcon, formatTime, thumbUrl, avatar, toast, paintRange } from './dom.js';
 import { SyncPlayer } from './player.js';
+import { chooseBackend } from './backend.js';
 
 /* ==========================================================================
    State
@@ -30,10 +31,15 @@ const state = {
   added: new Set(),
   scrubbing: false,
   busy: false,
+  holding: false,      // finger/mouse is down on the video (hold-to-2x)
+  rateLocked: false,   // we locked 2x (slide up while holding)
+  hideReactions: store.get('ms.hideReactions') === '1',
+  mutedFrom: new Set((() => { try { return JSON.parse(session.get('ms.mutedFrom') ?? '[]'); } catch { return []; } })()),
 };
 
 const el = {
-  lobby: $('#lobby'), room: $('#room'), stage: $('#stage'),
+  lobby: $('#lobby'), room: $('#room'), stage: $('#stage'), frame: $('#videoFrame'), overlay: $('#overlay'),
+  reactBtn: $('#reactBtn'), reactMenu: $('#reactMenu'), ratePill: $('#ratePill'),
   form: $('#lobbyForm'), name: $('#nameInput'), code: $('#codeInput'),
   createBtn: $('#createBtn'), joinBtn: $('#joinBtn'), error: $('#lobbyError'),
   connStatus: $('#connStatus'), connText: $('#connText'), inviteNote: $('#inviteNote'),
@@ -53,11 +59,8 @@ const el = {
 /* ==========================================================================
    Connection
    ========================================================================== */
-const conn = new signalR.HubConnectionBuilder()
-  .withUrl(`${(window.MUSIC_SPACE_API || '').replace(/\/$/, '')}/musicHub`)
-  .withAutomaticReconnect({ nextRetryDelayInMilliseconds: (ctx) => Math.min(1000 * (ctx.previousRetryCount + 1), 8000) })
-  .configureLogging(signalR.LogLevel.Warning)
-  .build();
+const conn = await chooseBackend();
+const p2p = conn.mode === 'p2p';
 
 const call = (method, ...args) => conn.invoke(method, ...args);
 
@@ -162,19 +165,27 @@ el.code.addEventListener('input', () => {
   el.code.value = (fromLink ?? raw).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 });
 
-el.form.addEventListener('submit', async (e) => {
-  e.preventDefault();
+async function submitLobby(action) {
   if (state.busy) return;
-  let action = e.submitter?.dataset.action ?? 'create';
-  if (inviteCode || document.activeElement === el.code) action = 'join';
-
   const name = el.name.value.trim();
   if (!name) return showLobbyError('Pick a nickname so your friends know who you are.', el.name);
   if (action === 'join' && !el.code.value.trim()) return showLobbyError('Enter the 6-character room code.', el.code);
 
   store.set('ms.name', name);
   await enterRoom(action, name, el.code.value);
+}
+
+el.form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  // Enter key → implicit submit. On an invite page, or while typing a code, that means "join".
+  const joining = inviteCode || document.activeElement === el.code || e.submitter?.dataset.action === 'join';
+  submitLobby(joining ? 'join' : 'create');
 });
+// On an invite page the secondary "Create a room" button must really create, not join.
+if (inviteCode) {
+  el.createBtn.type = 'button';
+  el.createBtn.addEventListener('click', () => submitLobby('create'));
+}
 
 async function enterRoom(action, name, code) {
   setBusy(true);
@@ -266,7 +277,19 @@ conn.on('chat', (msg) => {
   }
 });
 
-conn.on('reaction', (name, emoji) => floatReaction(emoji, name === state.me?.name ? 'You' : name));
+const recentReacts = new Map();
+const reactionFlood = (name) => {          // one person spamming? show only the first few of a burst
+  const now = Date.now();
+  const times = (recentReacts.get(name) ?? []).filter((t) => now - t < 5000);
+  times.push(now);
+  recentReacts.set(name, times);
+  return times.length > 6;
+};
+conn.on('reaction', (name, emoji) => {
+  if (name === state.me?.name) return;                         // our own already floated instantly on tap
+  if (state.hideReactions || state.mutedFrom.has(name) || reactionFlood(name)) return;
+  floatReaction(emoji, name);
+});
 
 /* ==========================================================================
    Rendering
@@ -282,7 +305,7 @@ function renderAll() {
   if (!r) return;
   el.roomName.textContent = r.name;
   el.codeText.textContent = r.code;
-  el.roomSub.replaceChildren(h('span', { class: 'live-dot' }), `${r.members.length} listening`);
+  el.roomSub.replaceChildren(h('span', { class: 'live-dot' }), `${r.members.length} listening${p2p ? ' · serverless' : ''}`);
   renderNowPlaying();
   renderQueue();
   renderPeople();
@@ -311,6 +334,9 @@ function renderNowPlaying() {
   el.play.setAttribute('aria-label', playing ? 'Pause' : 'Play');
   setIcon(el.play, playing ? 'pause' : 'play');
   if (!hasSong) { el.seek.value = 0; paintRange(el.seek); el.timeNow.textContent = '0:00'; }
+  el.frame.classList.toggle('no-song', !hasSong);
+  syncOverlay(playing);
+  renderRatePill();
 
   if (s) el.ambient.style.setProperty('--art', `url(${thumbUrl(s.id)})`);
   el.ambient.classList.toggle('has-art', hasSong);
@@ -392,7 +418,21 @@ function renderPeople() {
       h('div', { class: 'person-name' },
         h('span', { text: m.name }),
         m.id === state.me?.id ? h('span', { class: 'tag', text: 'You' }) : null,
-        m.isHost ? h('span', { class: 'tag host' }, icon('crown'), 'Host') : null)));
+        m.isHost ? h('span', { class: 'tag host' }, icon('crown'), 'Host') : null),
+      m.id === state.me?.id ? null : h('div', { class: 'person-end' }, (() => {
+        const muted = state.mutedFrom.has(m.name);
+        return h('button', {
+          class: 'icon-btn sm', type: 'button', 'aria-pressed': String(muted),
+          title: muted ? `Show reactions from ${m.name}` : `Hide reactions from ${m.name}`,
+          'aria-label': muted ? `Show reactions from ${m.name}` : `Hide reactions from ${m.name}`,
+          onclick: () => {
+            muted ? state.mutedFrom.delete(m.name) : state.mutedFrom.add(m.name);
+            session.set('ms.mutedFrom', JSON.stringify([...state.mutedFrom]));
+            toast(muted ? `Showing reactions from ${m.name}` : `Hiding reactions from ${m.name}`);
+            renderPeople();
+          },
+        }, icon(muted ? 'eye-off' : 'eye'));
+      })())));
   }
   el.peopleView.replaceChildren(...nodes);
 }
@@ -446,6 +486,7 @@ el.searchForm.addEventListener('submit', async (e) => {
   } catch (err) {
     state.results = [];
     toast(err?.message?.split(': ').pop() || 'Search failed. Try again.', 'error');
+    if (p2p) $('#searchSettings').open = true;
   } finally {
     state.searching = false;
     renderSearch();
@@ -498,16 +539,53 @@ el.chatForm.addEventListener('submit', (e) => {
   call('SendChat', text).catch(() => toast('Message not sent.', 'error'));
 });
 
-/* ---------- reactions ---------- */
-const reactionBar = $('#reactionBar');
-for (const emoji of REACTIONS) {
-  reactionBar.append(h('button', { class: 'react-btn', type: 'button', 'aria-label': `React ${emoji}`, onclick: () => call('React', emoji).catch(() => {}) }, emoji));
+/* ---------- reactions: tucked behind one icon, floating emoji are smooth ---------- */
+REACTIONS.forEach((emoji, i) => {
+  el.reactMenu.append(h('button', {
+    class: 'react-btn', type: 'button', 'aria-label': `React ${emoji}`, style: `--i:${i}`,
+    onclick: () => { floatReaction(emoji, 'You'); call('React', emoji).catch(() => {}); setMenu(true); }, // instant for the sender
+  }, emoji));
+});
+
+// One switch to silence everyone's floating emoji on *this* screen (yours always show).
+el.reactMenu.append(h('span', { class: 'react-sep', 'aria-hidden': 'true' }), (() => {
+  const btn = h('button', { class: 'react-btn toggle', type: 'button', id: 'hideReactBtn', style: `--i:${REACTIONS.length}`, onclick: () => setHideReactions(!state.hideReactions) }, icon('eye-off'));
+  return btn;
+})());
+function setHideReactions(hide, { silent = false } = {}) {
+  state.hideReactions = hide;
+  store.set('ms.hideReactions', hide ? '1' : '0');
+  const btn = $('#hideReactBtn');
+  btn.setAttribute('aria-pressed', String(hide));
+  const label = hide ? 'Show reactions from others' : 'Hide reactions from others';
+  btn.title = label; btn.setAttribute('aria-label', label);
+  setIcon(el.reactBtn, hide ? 'smile-off' : 'smile');
+  if (hide) el.reactionsLayer.replaceChildren();
+  if (!silent) toast(hide ? 'Reactions from others are hidden on your screen' : 'Reactions from others are visible again');
 }
+setHideReactions(state.hideReactions, { silent: true });
+
+let menuTimer;
+const menuOpen = () => el.reactMenu.classList.contains('open');
+function setMenu(open) {
+  el.reactMenu.classList.toggle('open', open);
+  el.reactBtn.setAttribute('aria-expanded', String(open));
+  clearTimeout(menuTimer);
+  if (open) { menuTimer = setTimeout(() => setMenu(false), 4500); showOverlay(); } else armOverlay();
+}
+el.reactBtn.addEventListener('click', () => setMenu(!menuOpen()));
+document.addEventListener('pointerdown', (e) => { if (menuOpen() && !e.target.closest('.react-wrap')) setMenu(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menuOpen()) { setMenu(false); el.reactBtn.focus(); } });
 
 function floatReaction(emoji, who) {
-  const node = h('div', { class: 'float-react', style: { left: `${10 + Math.random() * 78}%` } }, h('b', { text: emoji }), h('span', { text: who }));
-  node.addEventListener('animationend', () => node.remove());
-  el.reactionsLayer.append(node);
+  const layer = el.reactionsLayer;
+  while (layer.children.length >= 36) layer.firstElementChild.remove();
+  const node = h('div', { class: 'float-react', style: { left: `${8 + Math.random() * 80}%` } }, h('b', { text: emoji }), h('span', { text: who }));
+  node.style.setProperty('--rise', `${Math.round(layer.clientHeight * (0.55 + Math.random() * 0.25))}px`);
+  node.style.setProperty('--sway', `${10 + Math.random() * 16}px`);
+  node.style.animationDuration = `${3 + Math.random() * 0.8}s`;
+  node.addEventListener('animationend', (e) => { if (e.target === node) node.remove(); });
+  layer.append(node);
 }
 
 /* ==========================================================================
@@ -573,22 +651,112 @@ setInterval(() => {
   paintRange(el.seek);
 }, 250);
 
-/* fullscreen */
-const fullBtn = $('#fullBtn');
-if (!el.stage.requestFullscreen) fullBtn.hidden = true;
-fullBtn.addEventListener('click', toggleFullscreen);
-function toggleFullscreen() {
-  if (document.fullscreenElement) document.exitFullscreen();
-  else el.stage.requestFullscreen?.().catch(() => {});
+/* ---------- YouTube-style overlay: visible when paused or touched, fades while music plays ---------- */
+const frame = el.frame;
+let overlayTimer = 0;
+
+const overlayMustStay = () => !song() || !playback()?.playing || menuOpen() || !!frame.querySelector(':focus-visible');
+function armOverlay() {
+  clearTimeout(overlayTimer);
+  if (overlayMustStay()) return;
+  overlayTimer = setTimeout(() => { if (!overlayMustStay()) frame.classList.add('idle'); }, 3000);
 }
-let idleTimer;
-const wake = () => {
-  el.stage.classList.remove('idle');
-  clearTimeout(idleTimer);
-  if (document.fullscreenElement) idleTimer = setTimeout(() => el.stage.classList.add('idle'), 2500);
-};
-for (const ev of ['mousemove', 'pointerdown', 'touchstart', 'keydown']) el.stage.addEventListener(ev, wake, { passive: true });
-document.addEventListener('fullscreenchange', wake);
+function showOverlay() { frame.classList.remove('idle'); armOverlay(); }
+function hideOverlayNow() { clearTimeout(overlayTimer); if (!overlayMustStay()) frame.classList.add('idle'); }
+function syncOverlay(playing) {
+  if (!playing || !song()) { clearTimeout(overlayTimer); frame.classList.remove('idle'); }
+  else if (!frame.classList.contains('idle')) armOverlay();
+}
+
+frame.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') showOverlay(); });
+frame.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') { clearTimeout(overlayTimer); overlayTimer = setTimeout(hideOverlayNow, 700); } });
+el.overlay.addEventListener('pointerdown', showOverlay);
+el.overlay.addEventListener('input', showOverlay);
+/* ---------- gestures on the video ----------
+   tap            → play / pause
+   press and hold → 2× for the whole room while held (everyone fast-forwards together)
+   …and slide up  → lock 2× (tap again, or press the badge, to go back to 1×) */
+const shield = $('.video-shield');
+const HOLD_MS = 380, LOCK_PX = 56, MOVE_TOLERANCE = 12;
+let press = null;
+
+const setRate = (r) => call('SetRate', r).catch(() => {});
+
+function renderRatePill() {
+  const rate = playback()?.rate ?? 1;
+  const active = !!song() && (rate > 1 || state.holding);
+  if (!active) { state.rateLocked = false; el.ratePill.hidden = true; return; }
+  const locked = state.rateLocked || (press?.locked ?? false);
+  let label;
+  if (state.holding) label = press?.locked ? '2× locked' : '2× · slide up to lock';
+  else if (state.rateLocked) label = '2× locked · tap to resume';
+  else label = '2× speed · tap for normal';           // somebody else is holding / locked it
+  el.ratePill.classList.toggle('locked', locked);
+  el.ratePill.replaceChildren(icon(locked ? 'lock' : 'ff'), label);
+  el.ratePill.hidden = false;
+}
+
+function releaseSpeed() {
+  state.holding = false; state.rateLocked = false; press = null;
+  el.ratePill.hidden = true;
+  setRate(1);
+}
+
+shield.addEventListener('contextmenu', (e) => e.preventDefault());
+shield.addEventListener('pointerdown', (e) => {
+  if (!song() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (state.rateLocked) { releaseSpeed(); return; }                                  // a tap ends our own lock
+  shield.setPointerCapture?.(e.pointerId);
+  const p = press = { id: e.pointerId, x: e.clientX, y: e.clientY, held: false, locked: false, moved: false, timer: 0 };
+  p.timer = setTimeout(() => {
+    if (press !== p) return;
+    p.held = true; state.holding = true;
+    navigator.vibrate?.(12);
+    setRate(2); renderRatePill(); hideOverlayNow();                  // controls get out of the way, like YouTube
+  }, HOLD_MS);
+});
+shield.addEventListener('pointermove', (e) => {
+  if (!press || e.pointerId !== press.id) return;
+  const dx = e.clientX - press.x, dy = e.clientY - press.y;
+  if (!press.held) { if (Math.hypot(dx, dy) > MOVE_TOLERANCE) { clearTimeout(press.timer); press.moved = true; } return; }
+  if (!press.locked && dy < -LOCK_PX) { press.locked = true; navigator.vibrate?.(20); renderRatePill(); }
+});
+function endPress(e, cancelled) {
+  if (!press || e.pointerId !== press.id) return;
+  const p = press; clearTimeout(p.timer);
+  if (p.held) {
+    state.holding = false;
+    if (p.locked && !cancelled) { state.rateLocked = true; press = null; renderRatePill(); }
+    else releaseSpeed();
+  } else {
+    press = null;
+    if (!p.moved && !cancelled) { call('TogglePlay'); showOverlay(); }       // a plain tap
+  }
+}
+shield.addEventListener('pointerup', (e) => endPress(e, false));
+shield.addEventListener('pointercancel', (e) => endPress(e, true));
+el.ratePill.addEventListener('click', releaseSpeed);
+// Never leave the room stuck at 2× because a finger went away.
+addEventListener('blur', () => { if (press?.held && !press.locked) releaseSpeed(); });
+addEventListener('pagehide', () => { if (state.holding || state.rateLocked) releaseSpeed(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && press?.held && !press.locked) releaseSpeed(); });
+
+/* ---------- fullscreen: the video frame itself fills the screen (with a CSS fallback for iPhone) ---------- */
+const fullBtn = $('#fullBtn');
+const isFull = () => document.fullscreenElement === frame || frame.classList.contains('pseudo-full');
+async function toggleFullscreen() {
+  if (isFull()) {
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    frame.classList.remove('pseudo-full');
+    screen.orientation?.unlock?.();
+  } else if (frame.requestFullscreen) {
+    try { await frame.requestFullscreen({ navigationUI: 'hide' }); screen.orientation?.lock?.('landscape').catch(() => {}); }
+    catch { frame.classList.add('pseudo-full'); }
+  } else frame.classList.add('pseudo-full'); // browsers without element fullscreen (iPhone Safari)
+  showOverlay();
+}
+fullBtn.addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) screen.orientation?.unlock?.(); showOverlay(); });
 
 /* ==========================================================================
    Tabs
@@ -644,6 +812,7 @@ $('#emptyInviteBtn').addEventListener('click', shareInvite);
    ========================================================================== */
 document.addEventListener('keydown', (e) => {
   if (!state.room || e.ctrlKey || e.metaKey || e.altKey) return;
+  showOverlay();
   const t = e.target;
   if (t.matches('input, textarea, select, [contenteditable], [role=tab]')) return;
   if (e.key === ' ' && !t.matches('button')) { e.preventDefault(); if (song()) call('TogglePlay'); }
@@ -683,13 +852,41 @@ setInterval(syncWakeLock, 4000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { player.reconcile(true); syncWakeLock(); } });
 
 /* ==========================================================================
+   Serverless-mode extras
+   ========================================================================== */
+if (p2p) {
+  // Search settings: the optional personal YouTube Data API key lives only in this browser.
+  const keyInput = $('#ytKey');
+  keyInput.value = store.get('ms.ytkey') ?? '';
+  $('#saveKey').addEventListener('click', () => {
+    store.set('ms.ytkey', keyInput.value.trim());
+    toast(keyInput.value.trim() ? 'Key saved in this browser' : 'Key removed');
+  });
+  conn.on('integrity', (msg) => toast(msg, 'error'));
+  conn.on('kicked', () => { toast('You were removed from the room.', 'error'); leaveLocally(); });
+
+  // Without a server nobody knows a pasted video's length: the first player to load it reports it.
+  const reported = new Set();
+  setInterval(() => {
+    const s = song();
+    if (!s || s.duration || reported.has(s.id)) return;
+    const d = player.duration();
+    if (d > 0) { reported.add(s.id); call('SongMeta', s.id, d, player.title()).catch(() => {}); }
+  }, 1500);
+
+  // Leaving politely lets the room hand over to someone else.
+  addEventListener('pagehide', () => { if (state.room) conn.invoke('LeaveRoom'); });
+}
+
+/* ==========================================================================
    Boot
    ========================================================================== */
 initLobby();
 setConn('', 'Connecting to server…');
 
 connect().then(async () => {
-  setConn('ok', 'Connected');
+  setConn('ok', p2p ? (conn.local ? 'Ready · same-browser demo mode' : 'Ready · peer-to-peer, no server') : 'Connected');
+  document.body.classList.toggle('p2p', p2p);
   setBusy(false);
 
   // Page reload while inside a room → quietly take our seat back.

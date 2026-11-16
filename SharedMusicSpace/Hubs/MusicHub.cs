@@ -54,6 +54,7 @@ public sealed class MusicHub(RoomService rooms, YouTubeService youtube, TimeProv
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        LastReaction.TryRemove(Context.ConnectionId, out _);
         await LeaveCurrentRoom();
         await base.OnDisconnectedAsync(exception);
     }
@@ -144,6 +145,13 @@ public sealed class MusicHub(RoomService rooms, YouTubeService youtube, TimeProv
         await Announce(room, $"{member.Name} skipped the song");
     }
 
+    /// <summary>Hold-to-2x: the whole room fast-forwards together. Only 1 and 2 are accepted.</summary>
+    public async Task SetRate(double rate)
+    {
+        var (room, _) = Resolve();
+        if (room != null && room.SetRate(rate, Context.ConnectionId)) await Broadcast(room);
+    }
+
     public async Task Seek(double seconds)
     {
         var (room, _) = Resolve();
@@ -176,9 +184,15 @@ public sealed class MusicHub(RoomService rooms, YouTubeService youtube, TimeProv
         if (room != null && msg != null) await Clients.Group(room.Code).SendAsync("chat", msg);
     }
 
+    // At most ~5 reactions per second per connection, so nobody can flood everyone's screen.
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> LastReaction = new();
+
     public async Task React(string emoji)
     {
         if (!Reactions.Contains(emoji)) return;
+        var nowTicks = Environment.TickCount64;
+        if (LastReaction.TryGetValue(Context.ConnectionId, out var last) && nowTicks - last < 200) return;
+        LastReaction[Context.ConnectionId] = nowTicks;
         var (room, member) = Resolve();
         if (room != null && member != null)
             await Clients.Group(room.Code).SendAsync("reaction", member.Name, emoji);
