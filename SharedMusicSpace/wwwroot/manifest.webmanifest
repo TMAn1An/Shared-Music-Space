@@ -1,0 +1,10 @@
+{
+  "name": "Music Space",
+  "short_name": "Music Space",
+  "description": "Listen to YouTube music in perfect sync with friends.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090f",
+  "theme_color": "#09090f",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

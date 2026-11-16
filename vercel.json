@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo skip",
+  "buildCommand": "node scripts/vercel-build.mjs",
+  "outputDirectory": "SharedMusicSpace/wwwroot",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/r/:code",
+      "destination": "/"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(js|css|vendor)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
+  ]
+}

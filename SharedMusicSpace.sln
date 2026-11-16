@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36717.8 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedMusicSpace", "SharedMusicSpace\SharedMusicSpace.csproj", "{53369FF8-29DD-4559-AB5C-C4BC22D4EF97}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedMusicSpace.Tests", "SharedMusicSpace.Tests\SharedMusicSpace.Tests.csproj", "{3DAC58AD-E8A2-48F7-96B4-B63457887C49}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{53369FF8-29DD-4559-AB5C-C4BC22D4EF97}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53369FF8-29DD-4559-AB5C-C4BC22D4EF97}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53369FF8-29DD-4559-AB5C-C4BC22D4EF97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DAC58AD-E8A2-48F7-96B4-B63457887C49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DAC58AD-E8A2-48F7-96B4-B63457887C49}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DAC58AD-E8A2-48F7-96B4-B63457887C49}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DAC58AD-E8A2-48F7-96B4-B63457887C49}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

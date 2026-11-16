@@ -1,0 +1,10 @@
+# Render blueprint for the realtime backend (SignalR needs a long-lived server, so not Vercel).
+services:
+  - type: web
+    name: music-space-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false   # set to your Vercel URL, e.g. https://music-space.vercel.app
